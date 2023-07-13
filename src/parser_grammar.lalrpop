@@ -1,0 +1,129 @@
+use std::str::FromStr;
+use std::sync::Arc;
+
+use crate::interpreter_environment::*;
+use crate::parser_helper::*;
+use crate::interpreter_utils::*;
+
+// https://github.com/lalrpop/lalrpop/issues/193
+// I need to write my own lexer to not get absolutely destroyed by LALRPOP
+// Maybe I have a workaround
+
+// To avoid writing a lexer for this we have to introduce some new rules
+// Type variables are preceded by # and all upper case so #TYPE
+// TERMs are upper case
+// Variables are all lowercase
+
+grammar;
+
+pub Expr: Term = OrTerm;
+
+OrTerm: Term = {
+    <l:OrTerm> "||" <r:AndTerm> => Term::LogicGate(LogicTerm::Or(Box::new(l), Box::new(r))),
+    AndTerm,
+}
+
+AndTerm: Term = {
+    <l:AndTerm> "&&" <r:NotTerm> => Term::LogicGate(LogicTerm::And(Box::new(l), Box::new(r))),
+    NotTerm,
+}
+
+NotTerm: Term = {
+    "!" <t:NotTerm> => Term::LogicGate(LogicTerm::Not(Box::new(t))),
+    ComparandTerm,
+}
+
+ComparandTerm: Term = {
+    <l:ComparandTerm> "==" <r:SummandTerm> => Term::LogicGate(LogicTerm::Eql(Box::new(l), Box::new(r))),
+    <l:ComparandTerm> ">" <r:SummandTerm> => Term::LogicGate(LogicTerm::GrT(Box::new(l), Box::new(r))),
+    <l:ComparandTerm> "<" <r:SummandTerm> => Term::LogicGate(LogicTerm::LsT(Box::new(l), Box::new(r))),
+    <l:ComparandTerm> ">=" <r:SummandTerm> => Term::LogicGate(LogicTerm::GrE(Box::new(l), Box::new(r))),
+    <l:ComparandTerm> "<=" <r:SummandTerm> => Term::LogicGate(LogicTerm::LsE(Box::new(l), Box::new(r))),
+    SummandTerm,
+}
+
+SummandTerm: Term = {
+    <l:SummandTerm> "+" <r:FactorTerm> => Term::LogicGate(LogicTerm::Add(Box::new(l), Box::new(r))),
+    <l:SummandTerm> "-" <r:FactorTerm> => Term::LogicGate(LogicTerm::Sub(Box::new(l), Box::new(r))),
+    FactorTerm,
+};
+
+FactorTerm: Term = {
+    <l:FactorTerm> "*" <r:Term> => Term::LogicGate(LogicTerm::Mul(Box::new(l), Box::new(r))),
+    <l:FactorTerm> "/" <r:Term> => Term::LogicGate(LogicTerm::Div(Box::new(l), Box::new(r))),
+    Term,
+};
+
+pub Term: Term = {
+    <n: Value> => Term::Constant(n),
+    <l: Label> => Term::Variable(l),
+    // <l: LogicTerm> => Term::LogicGate(l),
+    "LET" <l: Label> "=" <t: Term> => Term::Let(l, Box::new(t)),
+    "IF"  <decider: Term> <consequence: Term> "ELSE" <alternative: Term>  => Term::If(Box::new(decider), Box::new(consequence), Box::new(alternative)),
+    "FUN" <l: Label> "(" <ls: Labels> ")" <block: Term> => Term::Function(l, ls, Box::new(block)),
+    "CALL" <t:Term> "(" <ts: Terms> ")" => Term::FunctionCall(Box::new(t), ts),
+    <ts: TermBlock> => Term::Block(ts),
+    "(" <t:OrTerm> ")" => t,
+};
+
+pub TermBlock: TermBlock = {
+    // <t: Term> => Arc::new(vec![t]),
+    "{" <ts: InsideTermBlock> "}" => Arc::new(ts),
+};
+
+pub UnbracketedTermBlock : TermBlock = <t: InsideTermBlock> => Arc::new(t);
+
+InsideTermBlock: Vec<Term> = {
+    // <r""> => vec![],
+    <t: Term> ";" => vec![t],
+    <t: Term> ";" <ts: InsideTermBlock> => merge_terms(t, ts),
+}
+
+Terms: Vec<Term> = {
+    <r""> => vec![],
+    <t: Term> "," => vec![t],
+    <t: Term> "," <ts: InsideTermBlock> => merge_terms(t, ts),
+}
+
+pub Value: Value = {
+    <s:r"[0-9]+"> => Value::VInt(i32::from_str(s).unwrap()),
+    <s:r"[0-9]+\.[0-9]+"> => Value::VFloat(f32::from_str(s).unwrap()),
+    <b: Bool> => Value::VBool(b),
+    <s:r#""(?:[^"\\]|\\.)*""#> => Value::VString(remove_quotes(s.to_string())), // https://stackoverflow.com/questions/249791/regex-for-quoted-string-with-escaping-quotes
+    "{" <e: Elements> "}" => Value::VRecord(tuple_to_map(e)),
+    "[" <e: Element> "]" => element_to_variant(e),
+};
+
+//pub LogicTerm: LogicTerm = {
+//    "!" <t: Term> => LogicTerm::Not(Box::new(t)),
+//    "(" <t1: Term> "&" <t2: Term> ")" => LogicTerm::And(Box::new(t1), Box::new(t2)),
+//    "(" <t1: Term> "|" <t2: Term> ")" => LogicTerm::Or(Box::new(t1), Box::new(t2)),
+//    "(" <t1: Term> "+" <t2: Term> ")" => LogicTerm::Add(Box::new(t1), Box::new(t2)),
+//    "(" <t1: Term> "-" <t2: Term> ")" => LogicTerm::Sub(Box::new(t1), Box::new(t2)),
+//    "(" <t1: Term> "*" <t2: Term> ")" => LogicTerm::Mul(Box::new(t1), Box::new(t2)),
+//    "(" <t1: Term> "/" <t2: Term> ")" => LogicTerm::Div(Box::new(t1), Box::new(t2)),
+//    "(" <t1: Term> "==" <t2: Term> ")" => LogicTerm::Eql(Box::new(t1), Box::new(t2)),
+//    "(" <t1: Term> ">" <t2: Term> ")" => LogicTerm::GrT(Box::new(t1), Box::new(t2)),
+//    "(" <t1: Term> "<" <t2: Term> ")" => LogicTerm::LsT(Box::new(t1), Box::new(t2)),
+//    "(" <t1: Term> ">=" <t2: Term> ")" => LogicTerm::GrE(Box::new(t1), Box::new(t2)),
+//    "(" <t1: Term> "<=" <t2: Term> ")" => LogicTerm::LsE(Box::new(t1), Box::new(t2)),
+//};
+
+Bool : bool = {
+    "TRUE" => true,
+    "FALSE" => false,
+};
+
+Label: String = <s:r"([a-z]+[a-z0-9_]*)"> => s.to_string();
+Labels: Vec<String> = {
+    <r""> => vec![],
+    <l: Label> => vec![l],
+    <l: Label> "," <ls: Labels> => merge_labels(l, ls),
+};
+
+Element: (String, Value) = <s: Label> ":" <v: Value> => (s, v);
+Elements: Vec<(String, Value)> = {
+    <r""> => vec![],
+    <e: Element> => vec![e],
+    <e: Element> "," <es: Elements> => merge_elements(e, es),
+};
