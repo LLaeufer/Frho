@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use crate::interpreter_environment::*;
 use crate::parser_helper::*;
-use crate::interpreter_utils::*;
 
 // https://github.com/lalrpop/lalrpop/issues/193
 // I need to write my own lexer to not get absolutely destroyed by LALRPOP
@@ -16,7 +15,9 @@ use crate::interpreter_utils::*;
 
 grammar;
 
-pub Expr: Term = OrTerm;
+pub Expr: Term = { 
+    "LET" <l: Label> "=" <t: Expr> => Term::Let(l, Box::new(t)),
+    OrTerm, };
 
 OrTerm: Term = {
     <l:OrTerm> "||" <r:AndTerm> => Term::LogicGate(LogicTerm::Or(Box::new(l), Box::new(r))),
@@ -57,73 +58,120 @@ FactorTerm: Term = {
 pub Term: Term = {
     <n: Value> => Term::Constant(n),
     <l: Label> => Term::Variable(l),
-    // <l: LogicTerm> => Term::LogicGate(l),
-    "LET" <l: Label> "=" <t: Term> => Term::Let(l, Box::new(t)),
+    "{" "}" => Term::RecordConstruction(vec![]),
+    "{" <e: Elements> "}" => Term::RecordConstruction(e),
+    "[" <e: Element> "]" => Term::VariantConstruction(e),
+    "SEL" <t:Term> "->" <l: Term> => Term::RecordSelection(Box::new(t), Box::new(l)),
+    "SEL" <t:Term> "." <l: Label> => Term::RecordSelection(Box::new(t), Box::new(Term::Constant(Value::VLabel(l)))),
+    "UP" <t: Term> "->" <l: Term> "=" <u: Term> => Term::RecordUpdate(Box::new(t), Box::new(l), Box::new(u)),
+    "UP" <t: Term> "." <l: Label> "=" <u: Term> => Term::RecordUpdate(Box::new(t), Box::new(Term::Constant(Value::VLabel(l))), Box::new(u)),
     "IF"  <decider: Term> <consequence: Term> "ELSE" <alternative: Term>  => Term::If(Box::new(decider), Box::new(consequence), Box::new(alternative)),
-    "FUN" <l: Label> "(" <ls: Labels> ")" <block: Term> => Term::Function(l, ls, Box::new(block)),
+    "FUN" <l: Label> "(" <ls: LabelTypes> ")" <block: Term> => Term::Function(l, ls, Box::new(block)),
+    "FUN" <l: Label> "(" ")" <block: Term> => Term::Function(l, vec![], Box::new(block)),
+    "LAM" "(" <ls: LabelTypes> ")" <block: Term> => Term::AnonymousFunction(ls, Box::new(block)),
+    "LAM" "(" ")" <block: Term> => Term::AnonymousFunction(vec![], Box::new(block)),
     "CALL" <t:Term> "(" <ts: Terms> ")" => Term::FunctionCall(Box::new(t), ts),
+    "CALL" <t:Term> "(" ")" => Term::FunctionCall(Box::new(t), vec![]),
+    "WRAP" "<" <tv: TypeVariable> ":" <tps: Type> ">" <t: Term> => Term::BigLambda(tv, tps, Box::new(t)),
+    "UNWRAP" "<" <tv: TypeVariable> ">" <t: Term> => Term::TypeApplication(Box::new(t), tv),
+    "CASE" <t: Term> "WITH" "(" "[" <l: Label> ":" <vc: Label> "]" "->" <c: Term> ";" <va: Label> "->" <a: Term> ")" => Term::VariantCase(Box::new(t), l, vc, Box::new(c), va, Box::new(a)),
     <ts: TermBlock> => Term::Block(ts),
-    "(" <t:OrTerm> ")" => t,
+    // "(" <t:Expr> ")" => t,
 };
 
 pub TermBlock: TermBlock = {
-    // <t: Term> => Arc::new(vec![t]),
-    "{" <ts: InsideTermBlock> "}" => Arc::new(ts),
+    "(" <ts: InsideTermBlock> ")" => Arc::new(ts),
 };
 
-pub UnbracketedTermBlock : TermBlock = <t: InsideTermBlock> => Arc::new(t);
+pub Code : Term = <t: UnbracketedTermBlock> => Term::Block(t);
+
+pub UnbracketedTermBlock : TermBlock = {
+    <r""> => Arc::new(vec![]),
+    <t: InsideTermBlock> => Arc::new(t)
+    };
 
 InsideTermBlock: Vec<Term> = {
-    // <r""> => vec![],
-    <t: Term> ";" => vec![t],
-    <t: Term> ";" <ts: InsideTermBlock> => merge_terms(t, ts),
+    <t: Expr> => vec![t],
+    <t: Expr> ";" => vec![t],
+    <t: Expr> ";" <ts: InsideTermBlock> => merge_terms(t, ts),
 }
 
 Terms: Vec<Term> = {
     <r""> => vec![],
-    <t: Term> "," => vec![t],
-    <t: Term> "," <ts: InsideTermBlock> => merge_terms(t, ts),
+    <t: Expr> => vec![t],
+    <t: Expr> "," => vec![t],
+    <t: Expr> "," <ts: Terms> => merge_terms(t, ts),
 }
 
 pub Value: Value = {
     <s:r"[0-9]+"> => Value::VInt(i32::from_str(s).unwrap()),
     <s:r"[0-9]+\.[0-9]+"> => Value::VFloat(f32::from_str(s).unwrap()),
+    "NONE" => Value::VNone,
     <b: Bool> => Value::VBool(b),
     <s:r#""(?:[^"\\]|\\.)*""#> => Value::VString(remove_quotes(s.to_string())), // https://stackoverflow.com/questions/249791/regex-for-quoted-string-with-escaping-quotes
-    "{" <e: Elements> "}" => Value::VRecord(tuple_to_map(e)),
-    "[" <e: Element> "]" => element_to_variant(e),
+    "$" <l: Label> => Value::VLabel(l),
 };
-
-//pub LogicTerm: LogicTerm = {
-//    "!" <t: Term> => LogicTerm::Not(Box::new(t)),
-//    "(" <t1: Term> "&" <t2: Term> ")" => LogicTerm::And(Box::new(t1), Box::new(t2)),
-//    "(" <t1: Term> "|" <t2: Term> ")" => LogicTerm::Or(Box::new(t1), Box::new(t2)),
-//    "(" <t1: Term> "+" <t2: Term> ")" => LogicTerm::Add(Box::new(t1), Box::new(t2)),
-//    "(" <t1: Term> "-" <t2: Term> ")" => LogicTerm::Sub(Box::new(t1), Box::new(t2)),
-//    "(" <t1: Term> "*" <t2: Term> ")" => LogicTerm::Mul(Box::new(t1), Box::new(t2)),
-//    "(" <t1: Term> "/" <t2: Term> ")" => LogicTerm::Div(Box::new(t1), Box::new(t2)),
-//    "(" <t1: Term> "==" <t2: Term> ")" => LogicTerm::Eql(Box::new(t1), Box::new(t2)),
-//    "(" <t1: Term> ">" <t2: Term> ")" => LogicTerm::GrT(Box::new(t1), Box::new(t2)),
-//    "(" <t1: Term> "<" <t2: Term> ")" => LogicTerm::LsT(Box::new(t1), Box::new(t2)),
-//    "(" <t1: Term> ">=" <t2: Term> ")" => LogicTerm::GrE(Box::new(t1), Box::new(t2)),
-//    "(" <t1: Term> "<=" <t2: Term> ")" => LogicTerm::LsE(Box::new(t1), Box::new(t2)),
-//};
 
 Bool : bool = {
     "TRUE" => true,
     "FALSE" => false,
 };
 
+TypeVariable: String = "$"<s:r"([A-Z]+[A-Z0-9_]*)"> => s.to_string();
+TypeList: Vec<Type> = {
+    <l: Type> => vec![l],
+    <l: Type> "," <ls: TypeList> => merge_types(l, ls),
+};
+
+Type: Type = { 
+    "VAR" "(" <t: TypeVariable> ")" => Type::TypeVariable(t),
+    "NONE" => Type::NoneType,
+    "INT" => Type::IntType,
+    "BOOL" => Type::BoolType,
+    "FLOAT" => Type::FloatType,
+    "STRING" => Type::StringType,
+    "LABEL" => Type::LabelType,
+    "ALL" => Type::AllType,
+    "RECORD" "{" <l: LabelOccurrenceList> "}" => Type::RecordsType(l),
+    "VARIANT" "[" <l: LabelOccurrenceList> "]" => Type::VariantType(l),
+    "FUNCTION" "("  ")" "("  ")" => Type::FunctionType(vec![], vec![]),
+    "FUNCTION" "(" ")" "(" <to: TypeList> ")" => Type::FunctionType(vec![], to),
+    "FUNCTION" "(" <ti: TypeList> ")" "("  ")" => Type::FunctionType(ti, vec![]),
+    "FUNCTION" "(" <ti: TypeList> ")" "(" <to: TypeList> ")" => Type::FunctionType(ti, to),
+};
+
+LabelOccurrenceList: Vec<(Label, FieldOccurrence)> = {
+    <l: LabelOccurrence> => vec![l],
+    <l: LabelOccurrence> "," <ls: LabelOccurrenceList> => merge_occurences(l, ls),
+};
+
+LabelType: (Label, Type) = {
+    <l: Label> ":" <t: Type> => (l, t),
+}
+
+LabelTypes: Vec<(Label, Type)> = {
+    <l: LabelType> => vec![l],
+    <l: LabelType> "," <ls: LabelTypes> => merge_variant_types(l, ls),
+}
+
+LabelOccurrence: (Label, FieldOccurrence) = {
+    <l: Label> ":" <f: FieldOccurrence> => (l, f),
+};
+
+FieldOccurrence: FieldOccurrence = {
+    "-" => FieldOccurrence::Absent,
+    "+" <t:Type> => FieldOccurrence::Present(t),
+}
+
 Label: String = <s:r"([a-z]+[a-z0-9_]*)"> => s.to_string();
+
 Labels: Vec<String> = {
-    <r""> => vec![],
     <l: Label> => vec![l],
     <l: Label> "," <ls: Labels> => merge_labels(l, ls),
 };
 
-Element: (String, Value) = <s: Label> ":" <v: Value> => (s, v);
-Elements: Vec<(String, Value)> = {
-    <r""> => vec![],
+Element: (String, Box<Term>) = <s: Label> ":" <v: Term> => (s, Box::new(v));
+Elements: Vec<(String, Box<Term>)> = {
     <e: Element> => vec![e],
     <e: Element> "," <es: Elements> => merge_elements(e, es),
 };

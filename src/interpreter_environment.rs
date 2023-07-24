@@ -1,7 +1,9 @@
 
+use crate::interpreter_utils::string_to_str;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::cell::RefCell;
+use std::fmt::{self};
 
 pub type Var = String;
 pub type Label = String;
@@ -13,7 +15,7 @@ pub type EvaluationResult = Value;
 #[derive(Clone, PartialEq, Debug)]
 pub struct EnvironmentInternal {
     variables: HashMap<Var, Value>,
-    types: HashMap<Var, Type>,
+    // types: HashMap<Var, Type>,
     parent: Option<Arc<RefCell<EnvironmentInternal>>>,
 }
 
@@ -22,11 +24,19 @@ pub struct Environment {
     internal: Arc<RefCell<EnvironmentInternal>>,
 }
 
+
+// Only use these for the thread in interpreter.rs otherwise this could do scary things
+unsafe impl Send for Environment {}
+unsafe impl Sync for Environment {}
+
 macro_rules! env_behavior_helper {
-    ($kind:ident, $behavior_name:ident, $get:ident, $insert:ident, $keys:ident, $output:ident) => {
+    ($kind:ident, $behavior_name:ident, $get:ident, $insert:ident, $remove_at_level:ident, $keys_at_level:ident, $keys:ident, $output:ident) => {
         pub trait $behavior_name {
             fn $get(&self, var: &Var) -> Option<$output>;
             fn $insert(&mut self, var: Var, value: $output) -> bool;
+            // Removes value from current env level
+            fn $remove_at_level(&mut self, var: &Var);
+            fn $keys_at_level(&self) -> HashSet<Var>; 
             fn $keys(&self) -> HashSet<Var>; 
         }
 
@@ -51,6 +61,14 @@ macro_rules! env_behavior_helper {
                 true
             }
 
+            fn $remove_at_level(&mut self, var: &Var) {
+                self.$kind.remove(var);
+            }
+
+            fn $keys_at_level(&self) -> HashSet<Var> {
+                self.$kind.keys().cloned().collect()
+            }
+
             fn $keys(&self) -> HashSet<Var> {
                 match &self.parent {
                     Some(parent) => {
@@ -60,6 +78,8 @@ macro_rules! env_behavior_helper {
                     None =>  self.$kind.keys().cloned().collect(),
                 }
             }
+
+            
         }
 
         impl $behavior_name for Environment {
@@ -72,6 +92,14 @@ macro_rules! env_behavior_helper {
                 self.internal.borrow_mut().$insert(var, value)
             }
 
+            fn $remove_at_level(&mut self, var: &Var) {
+                self.internal.borrow_mut().$remove_at_level(var)
+            }
+
+            fn $keys_at_level(&self) -> HashSet<Var> {
+                self.internal.borrow().$keys_at_level()
+            }
+
             fn $keys(&self) -> HashSet<Var> {
                 self.internal.borrow().$keys()
             }
@@ -79,18 +107,23 @@ macro_rules! env_behavior_helper {
     };
 }
 
-env_behavior_helper!(variables, EnvironmentInternalBehaviorVariables, get, insert, keys, Value);
-env_behavior_helper!(types, EnvironmentInternalBehaviorTypes, get_type, insert_type, type_keys, Type);
+env_behavior_helper!(variables, EnvironmentInternalBehaviorVariables, get, insert, remove_at_level, keys_at_level, keys,Value);
+// env_behavior_helper!(types, EnvironmentInternalBehaviorTypes, get_type, insert_type, type_keys, Type);
 
 pub trait EnvironmentBehavior {
     fn new() -> Self;
     fn new_child(&self) -> Self;
     fn new_child_with(&self, with: HashMap<Var, Value>) -> Self;
+    fn set_parent_if_empty(&mut self, parent: Self) -> bool;
+    fn set_parent(&mut self, parent: Self);
+    fn remove_parent(&mut self);
+    fn get_parent(&self) -> Option<Environment>;
+    fn flat_clone(&self) -> Self;
 }
 
 impl EnvironmentBehavior for Environment {
     fn new() -> Self {
-        Environment { internal: Arc::new(RefCell::new(EnvironmentInternal {variables: HashMap::new(), types: HashMap::new(), parent: None})) }
+        Environment { internal: Arc::new(RefCell::new(EnvironmentInternal {variables: HashMap::new(), /*types: HashMap::new(),*/ parent: None})) }
     }
 
     fn new_child(&self) -> Self {
@@ -98,11 +131,50 @@ impl EnvironmentBehavior for Environment {
     }
 
     fn new_child_with(&self, with: HashMap<Var, Value>) -> Self {
-        Environment { internal: Arc::new(RefCell::new(EnvironmentInternal { variables: with, types: HashMap::new(), parent: Some(self.internal.clone()) })) }
+        Environment { internal: Arc::new(RefCell::new(EnvironmentInternal { variables: with, /*types: HashMap::new(),*/ parent: Some(self.internal.clone()) })) }
+    }
+
+    fn set_parent_if_empty(&mut self, parent: Self) -> bool {
+        let mut internal_self = self.internal.borrow_mut();
+        match &internal_self.parent {
+            Some(_) => false,
+            None => {internal_self.parent = Some(parent.internal.clone()); true}
+        }
+    }
+
+    fn set_parent(&mut self, parent: Self) {
+        let mut internal_self = self.internal.borrow_mut();
+        internal_self.parent = Some(parent.internal.clone());
+    }
+
+    fn remove_parent(&mut self) {
+        let mut internal_self = self.internal.borrow_mut();
+        internal_self.parent = None;
+    }
+
+    fn get_parent(&self) -> Option<Environment> {
+        /*match self.internal.borrow().parent.clone() {
+            Some(real_parent) => Some(Environment { internal: real_parent }),
+            None => None,
+        }*/
+        Some(Environment { internal: self.internal.borrow().parent.clone()? })
+    }
+
+    fn flat_clone(&self) -> Self {
+        let mut flat = Environment::new();
+        let keys = self.keys();
+        for key in keys {
+            match self.get(&key) {
+                Some(value) => {flat.insert(key.clone(), value.clone());}, // I probably need to handle VFuncs, VRecords, VAll and VVariants here differently
+                None => {},
+            }
+        }
+        flat
+
     }
 }
 
-type LabelOccurrence = (Label, FieldOccurrence);
+pub type LabelOccurrence = (Label, FieldOccurrence);
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Type {
@@ -126,38 +198,33 @@ pub enum FieldOccurrence {
     Present(Type)
 }
 pub type TermBlock = Arc<Vec<Term>>;
-
 pub type RawVariant = (Label, Box<Term>);
-
 pub type Variant = (Label, Value);
+pub type VariantType = (Var, Type);
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Term {
     Constant(Value),
     Variable(Var),
-    DefineTypeVariable(Var, Type),
     LogicGate(LogicTerm),
 
     Block(TermBlock),
 
+    // Variable-name, code-body that results in a value
     Let(Label, Box<Term>),
 
-    // Condition Concequence Alternative
+    // Condition Consequence Alternative
     If(Box<Term>, Box<Term>, Box<Term>),
 
-    // Function Label Parameters Functionbody
-    Function(Label, Vec<Var>, Box<Term>),
+    // Function Label Parameters Function-body
+    Function(Label, Vec<VariantType>, Box<Term>),
 
-    AnonymousFunction(Vec<Var>, Box<Term>),
-
-    // PolymorphicValue,
-
-    // ApplyType(Type, Box<Term>),
+    AnonymousFunction(Vec<VariantType>, Box<Term>),
 
     // Function to call, Parameter values
     FunctionCall(Box<Term>, Vec<Term>),
 
-    TypeApplication(Box<Term>, Type),
+    TypeApplication(Box<Term>, Label),
 
     RecordConstruction(Vec<RawVariant>),
 
@@ -176,10 +243,10 @@ pub enum Term {
     // Box<Term>2: What we execute if variant and label are incompatible
 
 
-    // Das ist quasi ein switch case, bei dem bei einem match das ganze verarbeitet wird und bei keinem match weitergereicht wird
+    // Simply a switch case, that can be nested
     VariantCase(Box<Term>, Label, Var, Box<Term>, Var, Box<Term>),
 
-    BigLambda(Type, Value),
+    BigLambda(Label, Type, Box<Term>),
 } 
 
 #[derive(Clone, PartialEq, Debug)]
@@ -195,7 +262,74 @@ pub enum Value {
     VRecord(HashMap<Label, Value>),
     VVariant(Label, Box<Value>),
 
-    VFunc(Box<Environment>, Vec<Var>, Box<Term>),
+    VFunc(Box<Environment>, Vec<VariantType>, Box<Term>),
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Value::VNone => write!(f, "VNone"),
+            Value::VInt(i) => write!(f, "VInt({})", i),
+            Value::VBool(b) => write!(f, "VBool({})", b),
+            Value::VFloat(fl) => write!(f, "VFloat({})", fl),
+            Value::VString(s) => write!(f, "VString({})", s),
+            Value::VLabel(l) => write!(f, "VLabel({})", l),
+            Value::VAll(a) => write!(f, "VAll({})", a),
+            Value::VRecord(m) => write!(f, "VRecord({})", serialize_record_content(m)),
+            Value::VVariant(l, v) => write!(f, "VVariant({}, {})", l, v),
+            Value::VFunc(_, p, b) => write!(f, "VFunc({:?}, {:?} )", p, b),
+        }
+    }
+}
+
+fn serialize_record_content(map: &HashMap<Label, Value>) -> String {
+    let mut ret = "{".to_string();
+    let mut fst = true;
+    for (label, value) in map {
+        if fst {fst = false} else {ret += ","}
+        ret += label;
+        ret += ":";
+        ret += string_to_str(&format!("{}", value));
+    }
+    ret += "}";
+    ret
+}
+
+
+pub trait ValueCleanup {
+    fn clean(&mut self);
+    fn should_clean(&self) -> bool;
+}
+
+impl ValueCleanup for Value {
+    fn clean(&mut self) {
+        match self {
+            Value::VAll(inner) => inner.clean(),
+            Value::VRecord(map) => {
+                for (_, inner) in map {
+                    inner.clean();
+                }
+            },
+            Value::VVariant(_, inner) => inner.clean(),
+            Value::VFunc(env, _, _) => env.remove_parent(),
+            _ => {},
+        }
+    }
+
+    fn should_clean(&self) -> bool {
+        match self {
+            Value::VAll(inner) => inner.should_clean(),
+            Value::VRecord(map) => {
+                for (_, inner) in map {
+                    if !inner.should_clean() {return false}
+                }
+                true
+            },
+            Value::VVariant(_, inner) => inner.should_clean(),
+            Value::VFunc(_, _, _) => false,
+            _ => true,
+        }
+    }
 }
 
 pub trait ValueTypes {
@@ -261,6 +395,7 @@ impl ValueTypes for Value {
 #[derive(PartialEq, Debug, Clone)]
 pub enum InvalidValueTranslation {
     Invalid(),
+    InvalidOperation(String, String, String),
     Unimplemented(),
 }
 
@@ -270,13 +405,13 @@ macro_rules! generic_value_function_template {
             match self {
                 Value::VInt(i1) => match second {
                     Value::VInt(i2) => Ok(Value::$value_type_int(*i1 $logic_function i2)),
-                    _ => Err(InvalidValueTranslation::Invalid()),
+                    _ => Err(InvalidValueTranslation::InvalidOperation(format!("{}", self), stringify!($func_name).to_string(), format!("{}", second))),
                 },
                 Value::VFloat(f1) => match second {
                     Value::VFloat(f2) => Ok(Value::$value_type_float(*f1 $logic_function f2)),
-                    _ => Err(InvalidValueTranslation::Invalid()),
+                    _ => Err(InvalidValueTranslation::InvalidOperation(format!("{}", self), stringify!($func_name).to_string(), format!("{}", second))),
                 },
-                _ => Err(InvalidValueTranslation::Invalid()),
+                _ => Err(InvalidValueTranslation::InvalidOperation(format!("{}", self), stringify!($func_name).to_string(), format!("{}", second))),
             }
         }
     };

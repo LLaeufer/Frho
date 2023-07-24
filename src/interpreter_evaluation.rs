@@ -10,6 +10,7 @@ pub enum EvaluationError {
     VariableNotOfDesiredType(Value, Type),
     VariableCannotBeReassignedInTheSameBlock(String),
     LogicError(InvalidValueTranslation),
+    ExtendedLogicError(Box<Term>, InvalidValueTranslation, Box<Term>),
     UnknownLogicError,
     UnknownError,
 }
@@ -19,11 +20,63 @@ pub type EvalResult = Result<EvaluationResult, EvaluationError>;
 pub type CustomEval<T> = Result<(Environment, T), EvaluationError>;
 pub type CustomEvalResult<T> = Result<T, EvaluationError>;
 
+/*
+fn clean_functions(raw: Eval) -> Eval {
+    macro_rules! clean {
+        ($block_env:ident) => {
+            for key in $block_env.keys_at_level() {
+                let value = $block_env.get(&key);
+                match value {
+                    Some(Value::VFunc(_, _, _)) => {
+                        $block_env.remove_at_level(&key); // Clean up functions -- so we dont leak memory
+                        // We still leak memory if we return a function
+                    },
+                    _ => {},
+                }
+            }
+        };
+    }
+    let (mut block_env, block_result) = raw?;
+    match block_result {
+        // What if we would flatten the environment and then return the modified function, based on the current environment?
+        // This could avoid leaking memory when returning a function.
+        Value::VFunc(_,_ ,_ ) => {},
+        _ => clean!(block_env),
+    }
+    Ok((block_env, block_result))
+}
+*/
+
+fn clean_functions(raw: Eval) -> Eval {
+    let (block_env, block_result) = raw?;
+    
+    if block_result.should_clean() {
+        for key in block_env.keys_at_level() {
+            let value = block_env.get(&key);
+            match value {
+                Some(mut val) => val.clean(),
+                None => {},
+            }
+        }
+    }
+
+    Ok((block_env, block_result))
+}
+
+pub fn evaluate(env: Environment, terms: &Term) -> Eval {
+    let (_, result) = match terms {
+        Term::Block(block) => clean_functions(evaluate_block_rec(env.new_child(), Value::VNone, block, 0))?,
+        _ => clean_functions(evaluate_single_term(env.new_child(), terms))?,
+    };
+    // We want to forget the block environment here and reuse the last environment
+    Ok((env, result))
+}
+
 pub fn evaluate_single_term(env: Environment, term: &Term) -> Eval {
     match term {
         Term::Constant(value) => Ok((env, value.clone())),
         Term::Variable(var) => evaluate_variable(env, var),
-        Term::DefineTypeVariable(var, types) => evaluate_define_type_variable(env, var, types),
+        // Term::DefineTypeVariable(var, types) => evaluate_define_type_variable(env, var, types),
         Term::LogicGate(logic_term) => evaluate_logic(env, logic_term),
         Term::Let(var, let_term) => evaluate_let(env, var, let_term),
         Term::If(decider, consequence, alternative) => evaluate_if(env, decider, consequence, alternative),
@@ -36,7 +89,8 @@ pub fn evaluate_single_term(env: Environment, term: &Term) -> Eval {
         Term::VariantConstruction(variant) => evaluate_variant_construction(env, variant),
         Term::VariantCase(v_block, des_label, con_var, con, alt_var, alt) => evaluate_variant_case(env, v_block, des_label, con_var, con, alt_var, alt),
         Term::TypeApplication(term_block, types) => evaluate_type_application(env, term_block, types),
-        Term::BigLambda(types, value) => evaluate_big_lambda(env, types, value),
+        Term::BigLambda(_label, types, term) => evaluate_big_lambda(env, types, term),
+
         _ => Err(EvaluationError::NotYetImplemented(term.clone())),
     }
 }
@@ -49,15 +103,10 @@ pub fn evaluate_variable(env: Environment, var: &String) -> Eval {
     Ok((env, result))
 }
 
-pub fn evaluate_define_type_variable(env: Environment, var: &String, types: &Type) -> Eval {
-    let mut env = env;
-    env.insert_type(var.clone(), types.clone());
-    Ok((env, Value::VNone))
-}
-
 pub fn evaluate_let(env: Environment, var: &String, result_term: &Term) -> Eval {
-    let (mut new_env, result) = evaluate_single_term(env, result_term)?;
+    let (mut new_env, result) = evaluate(env, result_term)?;
     if new_env.insert(var.clone(), result) {
+        // println!("Variable {}, assigned {}")
         return Ok((new_env, Value::VNone));
     } else {Err(EvaluationError::VariableCannotBeReassignedInTheSameBlock(var.clone()))}
 }
@@ -66,16 +115,6 @@ fn evaluate_block_rec(env: Environment, result: EvaluationResult, terms: &TermBl
     if terms.len() == index { return Ok((env, result)) }
     let (new_env, new_result) = evaluate_single_term(env, &terms[index])?;
     evaluate_block_rec(new_env, new_result, terms, index+1)
-}
-
-pub fn evaluate(env: Environment, terms: &Term) -> Eval {
-    // This new_child call leaks memory
-    let (_, result) = match terms {
-        Term::Block(block) => evaluate_block_rec(env.new_child(), Value::VNone, block, 0)?,
-        _ => evaluate_single_term(env.new_child(), terms)?,
-    };
-    // We want to forget the block environment here and reuse the last environment
-    Ok((env, result))
 }
 
 pub fn evaluate_function_block(env: &Environment, terms: &Term, parameter: HashMap<Var, Value>) -> EvalResult {
@@ -97,7 +136,7 @@ pub fn evaluate_if(env: Environment, decider: &Term, consequence: &Term, alterna
     }
 }
 
-pub fn evaluate_function(env: Environment, label: &Label, parameters: &Vec<Var>, body: &Term) -> Eval {
+pub fn evaluate_function(env: Environment, label: &Label, parameters: &Vec<VariantType>, body: &Term) -> Eval {
     let mut mut_env = env;
     let func_env = mut_env.new_child();
     if mut_env.insert(label.clone(), Value::VFunc(Box::new(func_env), parameters.clone(), Box::new(body.clone()))) {
@@ -106,7 +145,7 @@ pub fn evaluate_function(env: Environment, label: &Label, parameters: &Vec<Var>,
     Err(EvaluationError::VariableCannotBeReassignedInTheSameBlock(label.clone()))
 }
 
-pub fn evaluate_anonymous_function(env: Environment, parameters: &Vec<Var>, body: &Term) -> Eval {
+pub fn evaluate_anonymous_function(env: Environment, parameters: &Vec<VariantType>, body: &Term) -> Eval {
     let func_env = env.new_child();
     Ok((env, Value::VFunc(Box::new(func_env), parameters.clone(), Box::new(body.clone()))))
 } 
@@ -125,7 +164,12 @@ fn evaluate_block_vector(env: Environment, block_vector: &Vec<Term>) -> CustomEv
 
 }
 
-pub fn map_from_parameter(vars: Vec<Var>, values: Vec<Value>) -> HashMap<Var, Value> {
+pub fn map_from_parameter(vars: Vec<VariantType>, values: Vec<Value>) -> HashMap<Var, Value> {
+    fn fst(var_type: VariantType) -> Var {
+        let (var, _types) = var_type;
+        var
+    }
+    let vars: Vec<Var> = vars.into_iter().map(|x| fst(x)).collect();
     std::iter::zip(vars, values).collect()
 }
 
@@ -180,10 +224,6 @@ pub fn evaluate_record_selection(env: Environment, record: &Term, label: &Term) 
     }
 }
 
-//pub fn tuple_to_map(tup: Vec<(Var, Value)>) -> HashMap<Var, Value> {
-//    tup.into_iter().collect()
-//}
-
 pub fn evaluate_record_construction(env: Environment, unevaluated_record: &Vec<RawVariant>) -> Eval {
     fn eval_rec_con_rec(env: Environment, un_rec: &Vec<RawVariant>, mut rec: Vec<Variant>) -> CustomEval<Vec<Variant>> {
         if un_rec.len() == rec.len() { return Ok((env, rec)); }
@@ -219,16 +259,24 @@ pub fn evaluate_variant_case(env: Environment, variant_block: &Term, desired_lab
     }
 }
 
-pub fn evaluate_type_application(env: Environment, block: &Term, types: &Type) -> Eval {
+pub fn evaluate_type_application(env: Environment, block: &Term, _types: &String) -> Eval {
     let (env, block_result) = evaluate(env, block)?;
-    match block_result.cast_type(types) {
+    /*match block_result.cast_type(types) {
         Ok(casted) => Ok((env, casted)),
         Err(err) => Err(EvaluationError::VariableNotOfDesiredType(block_result, types.clone())),
+    }*/
+
+    match block_result {
+        Value::VAll(wrapped) => Ok((env, *wrapped)),
+        _ => Ok((env, block_result))
+
     }
 }
 
-pub fn evaluate_big_lambda(env: Environment, types: &Type, value: &Value) -> Eval {
-    Ok((env, Value::VAll(Box::new(value.clone()))))
+pub fn evaluate_big_lambda(env: Environment, _types: &Type, term: &Term) -> Eval {
+    // Ok((env, Value::VAll(Box::new(value.clone()))))
+    let (new_env, value) = evaluate(env, term)?;
+    Ok((new_env, Value::VAll(Box::new(value))))
     // Hier fehlt noch das die typen richtig behandelt werden. Leider verstehe ich das noch nicht ganz von der Definition
 }
 
@@ -245,9 +293,17 @@ pub fn evaluate_logic(env: Environment, logic_term: &LogicTerm) -> Eval {
             {
                 let (env1, res1) = evaluate($env, $block1)?;
                 let (env2, res2) = evaluate(env1, $block2)?;
-                map_logic_result(env2, res1.$func(res2))
+                match map_logic_result(env2, res1.$func(res2)) {
+                    Ok((env3, res3)) => Ok((env3, res3)),
+                    Err(err) => {
+                        match err {
+                            EvaluationError::LogicError(err) => Err(EvaluationError::ExtendedLogicError($block1.clone(), err, $block2.clone())),
+                            _ => Err(err),
+                        }
+                    },
+                }
             }
-        };
+        }
     }
 
     match logic_term {

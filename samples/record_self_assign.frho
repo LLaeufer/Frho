@@ -1,0 +1,3 @@
+LET x = { test: {}};
+LET y = UP x.test = x;
+y

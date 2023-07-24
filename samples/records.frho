@@ -1,0 +1,4 @@
+FUN fib (a: INT) IF (a <= 2) 1 ELSE (CALL fib(a-1)+CALL fib(a-2));
+LET rec = { test: 42, fib25: CALL fib(25), oink: "pig"};
+LET newrec = UP rec.oink = IF (SEL rec.fib25==75025) "piggy" ELSE "swine";
+SEL newrec -> IF (CALL fib(5) == 5) $oink ELSE $test;

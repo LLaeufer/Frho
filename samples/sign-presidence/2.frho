@@ -1,0 +1,2 @@
+LET sample = !FALSE && (TRUE || FALSE) == (!(FALSE || (TRUE && TRUE)));
+sample

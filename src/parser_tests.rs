@@ -1,6 +1,5 @@
 use crate::parser_grammar::*;
 use crate::interpreter_environment::*;
-use crate::interpreter_utils::*;
 
 use std::sync::Arc;
 
@@ -30,20 +29,6 @@ fn test_value() {
     let result = ValueParser::new().parse("FALSE").unwrap();
     assert_eq!(result, Value::VBool(false));
 
-    assert!(ValueParser::new().parse("{ test: 42 }").is_ok());
-    let result = ValueParser::new().parse("{ test: 42 }").unwrap();
-    let vrecordmap = tuple_to_map(vec![("test".to_string(), Value::VInt(42))]);
-    assert_eq!(result, Value::VRecord(vrecordmap));
-
-    assert!(ValueParser::new().parse("{ test: 42, oink: \"pig\" }").is_ok());
-    let result = ValueParser::new().parse("{ test: 42, oink: \"pig\" }").unwrap();
-    let vrecordmap = tuple_to_map(vec![("test".to_string(), Value::VInt(42)), ("oink".to_string(), Value::VString("pig".to_string()))]);
-    assert_eq!(result, Value::VRecord(vrecordmap));
-
-    assert!(ValueParser::new().parse("[ test: 42 ]").is_ok());
-    let result = ValueParser::new().parse("[ test: 42 ]").unwrap();
-    assert_eq!(result, Value::VVariant("test".to_string(), Box::new(Value::VInt(42))));
-
 }
 
 
@@ -52,6 +37,19 @@ fn test_terms() {
     assert!(TermParser::new().parse("7").is_ok());
     let result = TermParser::new().parse("7").unwrap();
     assert_eq!(result, Term::Constant(Value::VInt(7)));
+
+    assert!(TermParser::new().parse("{ test: 42 }").is_ok());
+    let result = TermParser::new().parse("{ test: 42 }").unwrap();
+    // let vrecordmap = tuple_to_map(vec![("test".to_string(), Value::VInt(42))]);
+    assert_eq!(result, Term::RecordConstruction(vec![("test".to_string(), Box::new(Term::Constant(Value::VInt(42))))]));
+
+    assert!(TermParser::new().parse("{ test: 42, oink: \"pig\" }").is_ok());
+    let result = TermParser::new().parse("{ test: 42, oink: \"pig\" }").unwrap();
+    assert_eq!(result, Term::RecordConstruction(vec![("test".to_string(), Box::new(Term::Constant(Value::VInt(42)))), ("oink".to_string(), Box::new(Term::Constant(Value::VString("pig".to_string()))))]));
+
+    assert!(TermParser::new().parse("[ test: 42 ]").is_ok());
+    let result = TermParser::new().parse("[ test: 42 ]").unwrap();
+    assert_eq!(result, Term::VariantConstruction(("test".to_string(), Box::new(Term::Constant(Value::VInt(42))))));
 }
 
 #[test]
@@ -63,6 +61,7 @@ fn test_unbracketed_term_block() {
     //assert!(UnbracketedTermBlockParser::new().parse("LET oink = \"pig\";").is_ok());
     //let result = UnbracketedTermBlockParser::new().parse("LET oink = \"pig\";").unwrap();
     //assert_eq!(result, Arc::new(vec![Term::Let("oink".to_string(), Arc::new(vec![Term::Constant(Value::VString("pig".to_string()))]))]));
+
     
 }
 
@@ -73,8 +72,8 @@ fn test_term_block() {
     //assert_eq!(result, Arc::new(vec![Term::Constant(Value::VInt(7))]));
 
 
-    assert!(TermBlockParser::new().parse("{7;}").is_ok());
-    let result = TermBlockParser::new().parse("{7;}").unwrap();
+    assert!(TermBlockParser::new().parse("(7;)").is_ok());
+    let result = TermBlockParser::new().parse("(7;)").unwrap();
     assert_eq!(result, Arc::new(vec![Term::Constant(Value::VInt(7))]));
 }
 

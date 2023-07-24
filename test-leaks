@@ -1,0 +1,30 @@
+#!python
+
+import sys
+import os
+
+def sys_arg_v_string():
+    string = ''
+    for arg in sys.argv[1:]:
+        string += '"' + arg + '" '
+    return string[:-1]
+
+os.system("cargo build")
+if sys.platform == "darwin":
+    # This sadly doesn't work since the tee command causes a hang after leaks is done executing
+    # os.system("leaks -atExit -- ./target/debug/frho " + sys_arg_v_string() + " | tee memorylog.txt")
+    lines = ""
+    handle = os.popen("leaks -atExit -- ./target/debug/frho " + sys_arg_v_string() + "; echo leaks test done!")
+    while handle:
+        line = handle.readline()
+        if line == "leaks test done!\n": # Ugly but it works
+            handle.close()
+            break
+        lines += line
+        print(line, end="")
+    output = open("memorylog.txt", "w")
+    output.write(lines)
+    output.close()
+
+else:
+    print("Your platform isn't supported")

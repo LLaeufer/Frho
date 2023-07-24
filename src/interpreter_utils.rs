@@ -3,11 +3,14 @@ use crate::interpreter_evaluation::*;
 
 use std::collections::HashSet;
 use std::collections::HashMap;
-use std::result;
-use std::sync::Arc;
 
 pub fn tuple_to_map(tup: Vec<(Var, Value)>) -> HashMap<Var, Value> {
     tup.into_iter().collect()
+}
+
+pub fn string_to_str(input: &String) -> &str {
+    let slice: &str = &*input;
+    slice
 }
 
 

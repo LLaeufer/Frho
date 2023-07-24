@@ -1,7 +1,4 @@
-use std::str::FromStr;
-
 use crate::interpreter_environment::*;
-use crate::interpreter_utils::*;
 
 pub fn label_or_bool(s: String) -> Value {
     if s == "true".to_string() {
@@ -35,29 +32,19 @@ macro_rules! merge_helper {
     };
 }
 
-type str_val = (String, Value);
+type StrTerm = (String, Box<Term>);
 
-merge_helper!(merge_elements, str_val);
+merge_helper!(merge_elements, StrTerm);
 merge_helper!(merge_labels, String);
 merge_helper!(merge_terms, Term);
+merge_helper!(merge_types, Type);
+merge_helper!(merge_occurences, LabelOccurrence);
+merge_helper!(merge_variant_types, VariantType);
 
-/*pub fn merge_elements(e: (String, Value), es: Vec<(String, Value)> ) -> Vec<(String, Value)> {
-    let mut ev = vec![e.clone()];
-    let mut esm = es.clone();
-    ev.append(&mut esm);
-    ev.clone()
-}
-
-pub fn merge_labels(e: String, es: Vec<String> ) -> Vec<String> {
-    let mut ev = vec![e.clone()];
-    let mut esm = es.clone();
-    ev.append(&mut esm);
-    ev.clone()
-}*/
-
-pub fn element_to_variant(e: (String, Value)) -> Value {
-    let (lab, val) = e;
-    Value::VVariant(lab.clone(), Box::new(val.clone()))
+pub fn element_to_variant(e: (String, Box<Term>)) -> Term {
+    // let (lab, val) = e;
+    // Value::VVariant(lab.clone(), Box::new(val.clone()))
+    Term::VariantConstruction(e)
 }
 
 pub fn remove_quotes(s: String) -> String {
