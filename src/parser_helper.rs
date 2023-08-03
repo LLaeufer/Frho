@@ -1,4 +1,6 @@
-use crate::interpreter_environment::*;
+use crate::types::*;
+use crate::values::*;
+use crate::terms::*;
 
 pub fn label_or_bool(s: String) -> Value {
     if s == "true".to_string() {

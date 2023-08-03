@@ -1,7 +1,11 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::interpreter_environment::*;
+use crate::terms::*;
+use crate::values::*;
+use crate::logicterms::*;
+use crate::types::*;
+use crate::utils::*;
 use crate::parser_helper::*;
 
 // https://github.com/lalrpop/lalrpop/issues/193
@@ -61,13 +65,17 @@ pub Term: Term = {
     "{" "}" => Term::RecordConstruction(vec![]),
     "{" <e: Elements> "}" => Term::RecordConstruction(e),
     "[" <e: Element> "]" => Term::VariantConstruction(e),
-    "SEL" <t:Term> "->" <l: Term> => Term::RecordSelection(Box::new(t), Box::new(l)),
-    "SEL" <t:Term> "." <l: Label> => Term::RecordSelection(Box::new(t), Box::new(Term::Constant(Value::VLabel(l)))),
-    "UP" <t: Term> "->" <l: Term> "=" <u: Term> => Term::RecordUpdate(Box::new(t), Box::new(l), Box::new(u)),
-    "UP" <t: Term> "." <l: Label> "=" <u: Term> => Term::RecordUpdate(Box::new(t), Box::new(Term::Constant(Value::VLabel(l))), Box::new(u)),
+    "SEL" <t:Term> "." <l: Label> => Term::RecordSelection(Box::new(t), l),
+    "UP" <t: Term> "." <l: Label> "=" <u: Term> => Term::RecordUpdate(Box::new(t), l, Box::new(u)),
     "IF"  <decider: Term> <consequence: Term> "ELSE" <alternative: Term>  => Term::If(Box::new(decider), Box::new(consequence), Box::new(alternative)),
-    "FUN" <l: Label> "(" <ls: LabelTypes> ")" <block: Term> => Term::Function(l, ls, Box::new(block)),
-    "FUN" <l: Label> "(" ")" <block: Term> => Term::Function(l, vec![], Box::new(block)),
+    "FUN" <l: Label> "(" <ls: LabelTypes> ")" <block: Term> => Term::Function(l, None, ls, Box::new(block)),
+    "FUN" <l: Label> "(" ")" <block: Term> => Term::Function(l, None, vec![], Box::new(block)),
+    "REC" <l: Label> "(" <ls: LabelTypes> ")" <block: Term> => Term::RecursiveAnonymousFunction(l, None, ls, Box::new(block)),
+    "REC" <l: Label> "(" ")" <block: Term> => Term::RecursiveAnonymousFunction(l, None, vec![], Box::new(block)),
+    "FUN" <l: Label> "(" <ls: LabelTypes> ")" ":" <t:Type> <block: Term> => Term::Function(l, Some(t), ls, Box::new(block)),
+    "FUN" <l: Label> "(" ")" ":" <t:Type> <block: Term> => Term::Function(l, Some(t), vec![], Box::new(block)),
+    "REC" <l: Label> "(" <ls: LabelTypes> ")" ":" <t:Type> <block: Term> => Term::RecursiveAnonymousFunction(l, Some(t), ls, Box::new(block)),
+    "REC" <l: Label> "(" ")" ":" <t:Type> <block: Term> => Term::RecursiveAnonymousFunction(l, Some(t), vec![], Box::new(block)),
     "LAM" "(" <ls: LabelTypes> ")" <block: Term> => Term::AnonymousFunction(ls, Box::new(block)),
     "LAM" "(" ")" <block: Term> => Term::AnonymousFunction(vec![], Box::new(block)),
     "CALL" <t:Term> "(" <ts: Terms> ")" => Term::FunctionCall(Box::new(t), ts),
@@ -75,6 +83,8 @@ pub Term: Term = {
     "WRAP" "<" <tv: TypeVariable> ":" <tps: Type> ">" <t: Term> => Term::BigLambda(tv, tps, Box::new(t)),
     "UNWRAP" "<" <tv: TypeVariable> ">" <t: Term> => Term::TypeApplication(Box::new(t), tv),
     "CASE" <t: Term> "WITH" "(" "[" <l: Label> ":" <vc: Label> "]" "->" <c: Term> ";" <va: Label> "->" <a: Term> ")" => Term::VariantCase(Box::new(t), l, vc, Box::new(c), va, Box::new(a)),
+    "PROMISE" "<" <t: Type> ">" <ts: TermBlock> => Term::Promise(t, Box::new(Term::Block(ts))),
+    "PRINT" <t: Term> => Term::Print(Box::new(t)),
     <ts: TermBlock> => Term::Block(ts),
     // "(" <t:Expr> ")" => t,
 };

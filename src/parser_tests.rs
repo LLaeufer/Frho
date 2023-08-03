@@ -1,5 +1,7 @@
 use crate::parser_grammar::*;
-use crate::interpreter_environment::*;
+use crate::values::*;
+use crate::terms::*;
+use crate::logicterms::*;
 
 use std::sync::Arc;
 

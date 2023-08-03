@@ -1,0 +1,8 @@
+FUN one () 1;
+FUN count (a: INT, prev: FUNCTION () (FUNCTION () (INT))) IF (a == 10) (prev) ELSE (
+    FUN plus_one(with: FUNCTION () (INT)) (1 + CALL with());
+    FUN combine() CALL plus_one(prev);
+    CALL count(a+1, combine)
+);
+LET fun = CALL count(0, one);
+CALL fun()

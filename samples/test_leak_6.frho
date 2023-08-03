@@ -1,0 +1,6 @@
+FUN fib (a: INT) IF (a <= 2) 1 ELSE (CALL fib(a-1)+CALL fib(a-2));
+FUN count (a: INT, prev: FUNCTION () (FUNCTION () (INT))) IF (a == 10) (prev) ELSE (
+    CALL count(a+1, prev)
+);
+LET myfib = CALL count(0, fib);
+CALL myfib(5)

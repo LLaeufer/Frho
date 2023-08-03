@@ -1,0 +1,2 @@
+LET lam = LAM (a: INT) (FUN fib (a: INT) : INT IF (a <= 2) 1 ELSE (CALL fib(a-1)+CALL fib(a-2)); CALL fib(a));
+CALL lam(5)

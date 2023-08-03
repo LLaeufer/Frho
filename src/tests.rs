@@ -1,8 +1,12 @@
 use crate::parser_grammar::*;
-use crate::interpreter_environment::*;
-use crate::interpreter_utils::*;
+use crate::environment::*;
+use crate::utils::*;
+use crate::types::*;
+use crate::values::*;
+use crate::terms::*;
+use crate::logicterms::*;
 
-use crate::interpreter_evaluation::*;
+use crate::evaluation::*;
 use crate::interpreter::*;
 
 use std::collections::HashMap;
@@ -75,8 +79,11 @@ fn test_helper(path: String) -> (Term, Value) {
 
 macro_rules! test_result {
     ($path:expr, $expected:expr) => {
-        let (_, result) = test_helper($path.to_string());
+        let (ast, result) = test_helper($path.to_string());
+        let reconstructed = reconstruct_source_from_ast(&ast);
+        let recon_ast = parse_program_text(reconstructed);
         assert_eq!(result, $expected);
+        assert_eq!(ast, recon_ast);
     };
 }
 
@@ -91,6 +98,7 @@ macro_rules! test_sample {
 
 test_sample!(test_sample_case, "samples/case.frho", Value::VString("yay".to_string()));
 test_sample!(test_sample_fib, "samples/fib.frho", Value::VInt(75025));
+test_sample!(test_sample_fib_anon_rec, "samples/fib_anon_rec.frho", Value::VInt(75025));
 test_sample!(test_sample_let, "samples/let.frho", Value::VInt(42));
 test_sample!(test_sample_records, "samples/records.frho", Value::VString("piggy".to_string()));
 test_sample!(test_sample_recursion, "samples/recursion.frho", Value::VInt(100));
@@ -102,7 +110,17 @@ test_sample!(test_sign_presidence_3, "samples/sign-presidence/3.frho", Value::VB
 test_sample!(test_sample_test_leak, "samples/test_leak.frho", Value::VInt(10));
 test_sample!(test_sample_test_leak_2, "samples/test_leak_2.frho", Value::VInt(11));
 test_sample!(test_sample_test_leak_3, "samples/test_leak_3.frho", Value::VInt(1));
-
+test_sample!(test_sample_test_leak_5, "samples/test_leak_5.frho", Value::VInt(11));
+test_sample!(test_sample_test_leak_6, "samples/test_leak_6.frho", Value::VInt(5));
+test_sample!(test_sample_test_leak_7, "samples/test_leak_7.frho", Value::VInt(5));
+test_sample!(test_sample_test_leak_8_a, "samples/test_leak_8_a.frho", Value::VInt(5));
+test_sample!(test_sample_test_leak_8_b, "samples/test_leak_8_b.frho", Value::VInt(5));
+test_sample!(test_sample_test_leak_8_c, "samples/test_leak_8_c.frho", Value::VInt(5));
+test_sample!(test_sample_test_leak_8_d, "samples/test_leak_8_d.frho", Value::VInt(5));
+test_sample!(test_sample_test_leak_8_e, "samples/test_leak_8_e.frho", Value::VInt(5));
+test_sample!(test_term_checks_logicgate_possible_operation, "typecheck-samples/term-checks/logicgate/possible-operation.frho", Value::VString("Hello World!".to_string()));
+test_sample!(test_term_checks_logicgate_possible_operation_2, "typecheck-samples/term-checks/logicgate/possible-operation-2.frho", Value::VFloat(7.0));
+test_sample!(test_term_checks_logicgate_possible_operation_3, "typecheck-samples/term-checks/logicgate/possible-operation-3.frho", Value::VFloat(7.0));
 
 #[test]
 fn test_sample_record_self_assign () {
@@ -123,14 +141,14 @@ fn test_sample_wrap_and_unwrap_2 () {
 #[test]
 fn test_return_function () {
     let mut env = Environment::new();
-    let ast = Term::If(Box::new(Term::Block(Arc::new(vec![Term::LogicGate(LogicTerm::LsE(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(2)))))]))), Box::new(Term::Constant(Value::VInt(1))), 
-        Box::new(Term::Block(Arc::new(vec![Term::LogicGate(LogicTerm::Add(Box::new(Term::FunctionCall(Box::new(Term::Variable("fib".to_string())), vec![Term::LogicGate(LogicTerm::Sub(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(1)))))])), Box::new(Term::FunctionCall(Box::new(Term::Variable("fib".to_string())), vec![Term::LogicGate(LogicTerm::Sub(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(2)))))]))))]))));
+    let ast = Term::Block(Arc::new(vec![Term::If(Box::new(Term::Block(Arc::new(vec![Term::LogicGate(LogicTerm::LsE(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(2)))))]))), Box::new(Term::Constant(Value::VInt(1))), 
+        Box::new(Term::Block(Arc::new(vec![Term::LogicGate(LogicTerm::Add(Box::new(Term::FunctionCall(Box::new(Term::Variable("fib".to_string())), vec![Term::LogicGate(LogicTerm::Sub(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(1)))))])), Box::new(Term::FunctionCall(Box::new(Term::Variable("fib".to_string())), vec![Term::LogicGate(LogicTerm::Sub(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(2)))))]))))]))))]));
     let desired = Value::VFunc(Box::new(env.new_child()), vec![("a".to_string(), Type::IntType)], Box::new(ast));
     env.insert("fib".to_string(), desired.clone());
     let (_ast, result) = test_helper("samples/return_function.frho".to_string());
     match result {
         Value::VFunc(env, params , block) => match desired {
-            Value::VFunc(denv, dparams, dblock)=> {
+            Value::VFunc(denv, dparams, dblock) => {
                 assert_eq!(env.keys(), denv.keys());
                 assert_eq!(params, dparams);
                 assert_eq!(block, dblock);

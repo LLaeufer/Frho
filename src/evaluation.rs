@@ -1,7 +1,12 @@
-use crate::interpreter_environment::*;
-use crate::interpreter_utils::*;
+use crate::environment::*;
+use crate::types::*;
+use crate::utils::*;
+use crate::logicterms::*;
+use crate::terms::*;
+use crate::values::*;
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum EvaluationError {
@@ -22,32 +27,6 @@ pub type CustomEvalResult<T> = Result<T, EvaluationError>;
 
 /*
 fn clean_functions(raw: Eval) -> Eval {
-    macro_rules! clean {
-        ($block_env:ident) => {
-            for key in $block_env.keys_at_level() {
-                let value = $block_env.get(&key);
-                match value {
-                    Some(Value::VFunc(_, _, _)) => {
-                        $block_env.remove_at_level(&key); // Clean up functions -- so we dont leak memory
-                        // We still leak memory if we return a function
-                    },
-                    _ => {},
-                }
-            }
-        };
-    }
-    let (mut block_env, block_result) = raw?;
-    match block_result {
-        // What if we would flatten the environment and then return the modified function, based on the current environment?
-        // This could avoid leaking memory when returning a function.
-        Value::VFunc(_,_ ,_ ) => {},
-        _ => clean!(block_env),
-    }
-    Ok((block_env, block_result))
-}
-*/
-
-fn clean_functions(raw: Eval) -> Eval {
     let (block_env, block_result) = raw?;
     
     if block_result.should_clean() {
@@ -62,6 +41,26 @@ fn clean_functions(raw: Eval) -> Eval {
 
     Ok((block_env, block_result))
 }
+*/
+
+
+fn clean_functions(raw: Eval) -> Eval {
+    let (mut block_env, block_result) = raw?;
+    
+    if block_result.should_clean() {
+        /*for key in block_env.keys_at_level() {
+            let value = block_env.get(&key);
+            match value {
+                Some(mut val) => val.clean(),
+                None => {},
+            }
+        }*/
+        block_env.remove_parent();
+        block_env.cleanup();
+    }
+
+    Ok((block_env, block_result))
+}
 
 pub fn evaluate(env: Environment, terms: &Term) -> Eval {
     let (_, result) = match terms {
@@ -72,17 +71,18 @@ pub fn evaluate(env: Environment, terms: &Term) -> Eval {
     Ok((env, result))
 }
 
+#[allow(unreachable_patterns)]
 pub fn evaluate_single_term(env: Environment, term: &Term) -> Eval {
     match term {
         Term::Constant(value) => Ok((env, value.clone())),
         Term::Variable(var) => evaluate_variable(env, var),
-        // Term::DefineTypeVariable(var, types) => evaluate_define_type_variable(env, var, types),
         Term::LogicGate(logic_term) => evaluate_logic(env, logic_term),
         Term::Let(var, let_term) => evaluate_let(env, var, let_term),
         Term::If(decider, consequence, alternative) => evaluate_if(env, decider, consequence, alternative),
-        Term::Function(label, parameters, body) => evaluate_function(env, label, parameters, body),
+        Term::Function(label, _, parameters, body) => evaluate_function(env, label, parameters, body),
         Term::FunctionCall(func, parameter_inputs) => evaluate_function_call(env, func, parameter_inputs),
         Term::AnonymousFunction(parameters, parameter_inputs) => evaluate_anonymous_function(env, parameters, parameter_inputs),
+        Term::RecursiveAnonymousFunction(label, _,  parameters, body) => evaluate_recursive_anonymous_function(env, label, parameters, body),
         Term::RecordUpdate(record, label, new_value) => evaluate_record_update(env, record, label, new_value),
         Term::RecordSelection(record, label) => evaluate_record_selection(env, record, label),
         Term::RecordConstruction(variants) => evaluate_record_construction(env, variants),
@@ -90,15 +90,28 @@ pub fn evaluate_single_term(env: Environment, term: &Term) -> Eval {
         Term::VariantCase(v_block, des_label, con_var, con, alt_var, alt) => evaluate_variant_case(env, v_block, des_label, con_var, con, alt_var, alt),
         Term::TypeApplication(term_block, types) => evaluate_type_application(env, term_block, types),
         Term::BigLambda(_label, types, term) => evaluate_big_lambda(env, types, term),
+        Term::Promise(_, block) => evaluate(env, block),
+        Term::Print(term) => evaluate_print(env, term),
+        Term::Block(_) => evaluate(env, term),
 
         _ => Err(EvaluationError::NotYetImplemented(term.clone())),
     }
 }
+#[warn(unreachable_patterns)]
+
+
+
+pub fn evaluate_print(env: Environment, term: &Term) -> Eval {
+    let (env, result) = evaluate(env, term)?;
+    println!("{}", result);
+    Ok((env, Value::VNone))
+}
+
 
 pub fn evaluate_variable(env: Environment, var: &String) -> Eval {
     let result = match env.get(var) {
         Some(value) => value.clone(),
-        None => return Err(EvaluationError::VariableNotInEnvironment(var.clone()))
+        None => return Err(EvaluationError::VariableNotInEnvironment(var.clone())),
     };
     Ok((env, result))
 }
@@ -139,7 +152,7 @@ pub fn evaluate_if(env: Environment, decider: &Term, consequence: &Term, alterna
 pub fn evaluate_function(env: Environment, label: &Label, parameters: &Vec<VariantType>, body: &Term) -> Eval {
     let mut mut_env = env;
     let func_env = mut_env.new_child();
-    if mut_env.insert(label.clone(), Value::VFunc(Box::new(func_env), parameters.clone(), Box::new(body.clone()))) {
+    if mut_env.insert(label.clone(), Value::VFunc(Box::new(func_env), parameters.clone(), Box::new(Term::Block(Arc::new(vec![body.clone()]))))) {
         return Ok((mut_env, Value::VNone)); 
     }
     Err(EvaluationError::VariableCannotBeReassignedInTheSameBlock(label.clone()))
@@ -147,8 +160,14 @@ pub fn evaluate_function(env: Environment, label: &Label, parameters: &Vec<Varia
 
 pub fn evaluate_anonymous_function(env: Environment, parameters: &Vec<VariantType>, body: &Term) -> Eval {
     let func_env = env.new_child();
-    Ok((env, Value::VFunc(Box::new(func_env), parameters.clone(), Box::new(body.clone()))))
-} 
+    Ok((env, Value::VFunc(Box::new(func_env), parameters.clone(), Box::new(Term::Block(Arc::new(vec![body.clone()]))))))
+}
+
+pub fn evaluate_recursive_anonymous_function(env: Environment, label: &Label, parameters: &Vec<VariantType>, body: &Term) -> Eval {
+    let new_body = Term::Block(Arc::new(vec![Term::Function(label.clone(), None, parameters.clone(), Box::new(body.clone())), Term::FunctionCall(Box::new(Term::Variable(label.clone())), parameter_to_call_arguments(parameters.clone()))]));
+    let func_env = env.new_child();
+    Ok((env, Value::VFunc(Box::new(func_env), parameters.clone(), Box::new(Term::Block(Arc::new(vec![new_body.clone()]))))))
+}
 
 fn evaluate_block_vector(env: Environment, block_vector: &Vec<Term>) -> CustomEval<Vec<EvaluationResult>> {
     fn eval_b_v_internal(env: Environment, b_v: &Vec<Term>, res: Vec<EvaluationResult>) -> CustomEval<Vec<EvaluationResult>> {
@@ -161,6 +180,16 @@ fn evaluate_block_vector(env: Environment, block_vector: &Vec<Term>) -> CustomEv
         eval_b_v_internal(eval_env, b_v, mut_res)
     }
     eval_b_v_internal(env, block_vector, vec![])
+
+}
+
+pub fn parameter_to_call_arguments(vars: Vec<VariantType>) -> Vec<Term> {
+    fn fst(var_type: VariantType) -> Term {
+        let (var, _types) = var_type;
+        Term::Variable(var)
+    }
+    let vars: Vec<Term> = vars.into_iter().map(|x| fst(x)).collect();
+    vars
 
 }
 
@@ -189,40 +218,28 @@ pub fn evaluate_function_call(env: Environment, func_body_location: &Term, param
     }
 }
 
-pub fn evaluate_record_update(env: Environment, record: &Term, label: &Term, new_value: &Term) -> Eval {
+pub fn evaluate_record_update(env: Environment, record: &Term, label: &Label, new_value: &Term) -> Eval {
     let (env, record_result) = evaluate(env, record)?;
-    let (env, label_result) = evaluate(env, label)?;
     let (env, new_value_result) = evaluate(env, new_value)?;
     match record_result {
         Value::VRecord(map) => {
             let mut new_map = map.clone();
-            match label_result {
-                Value::VLabel(lab) =>{
-                    new_map.insert(lab, new_value_result);
-                    Ok((env, Value::VRecord(new_map)))
-                }
-                _ => Err(EvaluationError::VariableNotOfDesiredType(label_result, Type::LabelType))
-            }
+            new_map.insert(label.clone(), new_value_result);
+            Ok((env, Value::VRecord(new_map)))
         },
         _ => Err(EvaluationError::VariableNotOfDesiredType(record_result, Type::RecordsType(vec![])))
     }
 }
 
-pub fn evaluate_record_selection(env: Environment, record: &Term, label: &Term) -> Eval {
+pub fn evaluate_record_selection(env: Environment, record: &Term, label: &Label) -> Eval {
     let (env, record_result) = evaluate(env, record)?;
-    let (env, label_result) = evaluate(env, label)?;
     match record_result {
-        Value::VRecord(map) => {
-            match label_result {
-                Value::VLabel(lab) =>{
-                    Ok((env, map[&lab].clone()))
-                }
-                _ => Err(EvaluationError::VariableNotOfDesiredType(label_result, Type::LabelType))
-            }
-        },
+        Value::VRecord(map) => Ok((env, map[label].clone())),
         _ => Err(EvaluationError::VariableNotOfDesiredType(record_result, Type::RecordsType(vec![])))
     }
 }
+
+pub type Variant = (Label, Value);
 
 pub fn evaluate_record_construction(env: Environment, unevaluated_record: &Vec<RawVariant>) -> Eval {
     fn eval_rec_con_rec(env: Environment, un_rec: &Vec<RawVariant>, mut rec: Vec<Variant>) -> CustomEval<Vec<Variant>> {

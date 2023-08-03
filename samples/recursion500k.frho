@@ -1,0 +1,2 @@
+FUN count (a: INT) IF (a == 500000) a ELSE (PRINT a; CALL count(a+1));
+CALL count(0)

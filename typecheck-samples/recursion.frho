@@ -1,0 +1,2 @@
+FUN count (a: INT) : INT IF (a == 100) a ELSE CALL count(a+1);
+CALL count(0)

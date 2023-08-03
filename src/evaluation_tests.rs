@@ -1,6 +1,10 @@
-use crate::interpreter_environment::*;
-use crate::interpreter_evaluation::*;
-use crate::interpreter_utils::*;
+use crate::evaluation::*;
+use crate::environment::*;
+use crate::utils::*;
+use crate::types::*;
+use crate::values::*;
+use crate::terms::*;
+use crate::logicterms::*;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -119,7 +123,7 @@ fn test_term_if_alternative() {
 fn test_function_call() {
     let env = Environment::new();
     let desired_env = Environment::new();
-    let func_term_block = Term::Block(Arc::new(vec![Term::Function("addFunc".to_string(), vec![("a".to_string(), Type::IntType), ("b".to_string(), Type::IntType)], Box::new(Term::Block(Arc::new(vec![
+    let func_term_block = Term::Block(Arc::new(vec![Term::Function("addFunc".to_string(), None, vec![("a".to_string(), Type::IntType), ("b".to_string(), Type::IntType)], Box::new(Term::Block(Arc::new(vec![
         Term::LogicGate(LogicTerm::Add(Box::new(Term::Variable("a".to_string())), Box::new(Term::Variable("b".to_string()))))])))),
         Term::FunctionCall(Box::new(Term::Variable("addFunc".to_string())), vec![Term::Constant(Value::VInt(40)), Term::Constant(Value::VInt(2))])
         ]));
@@ -131,7 +135,7 @@ fn test_function_call() {
 pub fn test_function_call_recursion_abst(count: i32) {
     let env = Environment::new();
     let desired_env = Environment::new();
-    let func_term_block = Term::Block(Arc::new(vec![Term::Function("count".to_string(), vec![("a".to_string(), Type::IntType)], Box::new(Term::If(Box::new(Term::LogicGate(LogicTerm::Eql(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(count)))))), Box::new(Term::Variable("a".to_string())), Box::new(
+    let func_term_block = Term::Block(Arc::new(vec![Term::Function("count".to_string(), None, vec![("a".to_string(), Type::IntType)], Box::new(Term::If(Box::new(Term::LogicGate(LogicTerm::Eql(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(count)))))), Box::new(Term::Variable("a".to_string())), Box::new(
         Term::FunctionCall(Box::new(Term::Variable("count".to_string())), vec![Term::LogicGate(LogicTerm::Add(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(1)))))]))))
     ),
 
@@ -145,7 +149,19 @@ pub fn test_function_call_recursion_abst(count: i32) {
 
 #[test]
 fn test_function_call_recursion() {
-    test_function_call_recursion_abst(250);
+    use std::thread;
+    const STACK_SIZE: usize = 4 * 1024 * 1024 * 1024;
+    fn run() {
+        test_function_call_recursion_abst(250);
+    }
+
+    let child = thread::Builder::new()
+        .stack_size(STACK_SIZE)
+        .spawn(run)
+        .unwrap();
+
+    // Wait for thread to join
+    child.join().unwrap();
 }
 
 
@@ -223,8 +239,7 @@ fn test_record_selection() {
     map.insert("best_number".to_string(), Value::VInt(42));
     env.insert("rec".to_string(), Value::VRecord(map.clone()));
     desired_env.insert("rec".to_string(), Value::VRecord(map.clone()));
-    let record_select = Term::RecordSelection(Box::new(Term::Variable("rec".to_string())), 
-        Box::new(Term::Constant(Value::VLabel("best_number".to_string()))));
+    let record_select = Term::RecordSelection(Box::new(Term::Variable("rec".to_string())), "best_number".to_string());
     let result = evaluate_single_term(env, &record_select);
     let desired = Ok((desired_env, Value::VInt(42)));
     assert_equal_evaluation(result, desired)
@@ -242,7 +257,7 @@ fn test_record_update() {
     map.insert("best_number".to_string(), Value::VInt(42));
     let record_update = Term::RecordUpdate(
         Box::new(Term::Variable("rec".to_string())), 
-        Box::new(Term::Constant(Value::VLabel("best_number".to_string()))),
+        "best_number".to_string(),
         Box::new(Term::Constant(Value::VInt(42)))
     );
     let result = evaluate_single_term(env, &record_update);
