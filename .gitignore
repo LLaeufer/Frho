@@ -2,3 +2,4 @@
 *.DS_STORE
 memorylog.txt
 memorylogs/*
+private-resources/*
