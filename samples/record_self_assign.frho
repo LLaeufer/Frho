@@ -1,3 +1,3 @@
-LET x = { test: {}};
-LET y = UP x.test = x;
+let x = { test: {}};
+let y = x.test <- x;
 y

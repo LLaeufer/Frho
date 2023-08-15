@@ -1,4 +1,4 @@
-#!python
+#!/usr/bin/python3
 
 import sys
 import os
@@ -25,6 +25,7 @@ if sys.platform == "darwin":
     output = open("memorylog.txt", "w")
     output.write(lines)
     output.close()
-
+elif sys.platform == "linux":
+    os.system("valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose --log-file=memorylog.txt ./target/debug/frho " + sys_arg_v_string())
 else:
     print("Your platform isn't supported")

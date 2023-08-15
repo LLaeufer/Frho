@@ -1,1 +1,1 @@
-IF TRUE (3) ELSE ("ERROR")
+if (true) then (3) else ("ERROR")

@@ -16,10 +16,10 @@ use std::sync::Arc;
 #[test]
 fn test_recursion() {
     let parsed = CodeParser::new().parse(r"
-        FUN count (a: INT) (
-            IF (a == 100) (a) ELSE (CALL count(a+1))
+        fun count (a: INT) (
+            if (a == 100) then (a) else (count(a+1))
         );
-        CALL count(0)
+        count(0)
     ");
     assert!(parsed.is_ok());
     match parsed {
@@ -31,42 +31,6 @@ fn test_recursion() {
         },
         Err(_) => todo!(),
     }
-
-    // More minimal syntax
-    let parsed = CodeParser::new().parse(r"
-        FUN count (a: INT) (
-            IF (a == 100) a ELSE CALL count(a+1)
-        );
-        CALL count(0)
-    ");
-    assert!(parsed.is_ok());
-    match parsed {
-        Ok(cparsed) => {
-            let result = evaluate(Environment::new(), &cparsed);
-            let desired_env = Environment::new();
-            let desired = Ok((desired_env, Value::VInt(100)));
-            assert_equal_evaluation(result, desired)
-        },
-        Err(_) => todo!(),
-    }
-
-    // Super minimal syntax
-    let parsed = CodeParser::new().parse(r"
-        FUN count (a: INT) IF (a == 100) a ELSE CALL count(a+1);
-        CALL count(0)
-    ");
-    assert!(parsed.is_ok());
-    match parsed {
-        Ok(cparsed) => {
-            let result = evaluate(Environment::new(), &cparsed);
-            let desired_env = Environment::new();
-            let desired = Ok((desired_env, Value::VInt(100)));
-            assert_equal_evaluation(result, desired)
-        },
-        Err(_) => todo!(),
-    }
-
-
 
 
 }
@@ -96,8 +60,11 @@ macro_rules! test_sample {
     };
 }
 
+
 test_sample!(test_sample_case, "samples/case.frho", Value::VString("yay".to_string()));
 test_sample!(test_sample_fib, "samples/fib.frho", Value::VInt(75025));
+
+test_sample!(test_sample_fac, "samples/fac.frho", Value::VInt(120));
 test_sample!(test_sample_fib_anon_rec, "samples/fib_anon_rec.frho", Value::VInt(75025));
 test_sample!(test_sample_let, "samples/let.frho", Value::VInt(42));
 test_sample!(test_sample_records, "samples/records.frho", Value::VString("piggy".to_string()));
@@ -121,7 +88,7 @@ test_sample!(test_sample_test_leak_8_e, "samples/test_leak_8_e.frho", Value::VIn
 test_sample!(test_term_checks_logicgate_possible_operation, "typecheck-samples/term-checks/logicgate/possible-operation.frho", Value::VString("Hello World!".to_string()));
 test_sample!(test_term_checks_logicgate_possible_operation_2, "typecheck-samples/term-checks/logicgate/possible-operation-2.frho", Value::VFloat(7.0));
 test_sample!(test_term_checks_logicgate_possible_operation_3, "typecheck-samples/term-checks/logicgate/possible-operation-3.frho", Value::VFloat(7.0));
-
+test_sample!(test_sample_variant, "samples/variant.frho", Value::VInt(42));
 #[test]
 fn test_sample_record_self_assign () {
     let mut inner_map = HashMap::new();
@@ -138,11 +105,12 @@ fn test_sample_wrap_and_unwrap_2 () {
     test_result!("samples/wrap_and_unwrap_2.frho", Value::VRecord(map));
 }
 
+/*
 #[test]
 fn test_return_function () {
     let mut env = Environment::new();
-    let ast = Term::Block(Arc::new(vec![Term::If(Box::new(Term::Block(Arc::new(vec![Term::LogicGate(LogicTerm::LsE(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(2)))))]))), Box::new(Term::Constant(Value::VInt(1))), 
-        Box::new(Term::Block(Arc::new(vec![Term::LogicGate(LogicTerm::Add(Box::new(Term::FunctionCall(Box::new(Term::Variable("fib".to_string())), vec![Term::LogicGate(LogicTerm::Sub(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(1)))))])), Box::new(Term::FunctionCall(Box::new(Term::Variable("fib".to_string())), vec![Term::LogicGate(LogicTerm::Sub(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(2)))))]))))]))))]));
+    let ast = Term::Block(Arc::new(vec![Term::Block(Arc::new(vec![Term::If(Box::new(Term::Block(Arc::new(vec![Term::LogicGate(LogicTerm::LsE(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(2)))))]))), Box::new(Term::Constant(Value::VInt(1))), 
+        Box::new(Term::Block(Arc::new(vec![Term::LogicGate(LogicTerm::Add(Box::new(Term::FunctionCall(Box::new(Term::Variable("fib".to_string())), vec![Term::LogicGate(LogicTerm::Sub(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(1)))))])), Box::new(Term::FunctionCall(Box::new(Term::Variable("fib".to_string())), vec![Term::LogicGate(LogicTerm::Sub(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(2)))))]))))]))))]))]));
     let desired = Value::VFunc(Box::new(env.new_child()), vec![("a".to_string(), Type::IntType)], Box::new(ast));
     env.insert("fib".to_string(), desired.clone());
     let (_ast, result) = test_helper("samples/return_function.frho".to_string());
@@ -158,4 +126,25 @@ fn test_return_function () {
         _ => assert!(false),
     }
 }
+*/
 
+#[test]
+fn test_return_function () {
+    let mut env = Environment::new();
+    let ast = Term::Block(Arc::new(vec![Term::Block(Arc::new(vec![Term::If(Box::new(Term::Block(Arc::new(vec![Term::LogicGate(LogicTerm::LsE(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(2)))))]))), Box::new(Term::Block(Arc::new(vec![Term::Constant(Value::VInt(1))]))), 
+        Box::new(Term::Block(Arc::new(vec![Term::LogicGate(LogicTerm::Add(Box::new(Term::FunctionCall(Box::new(Term::Variable("fib".to_string())), vec![Term::LogicGate(LogicTerm::Sub(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(1)))))])), Box::new(Term::FunctionCall(Box::new(Term::Variable("fib".to_string())), vec![Term::LogicGate(LogicTerm::Sub(Box::new(Term::Variable("a".to_string())), Box::new(Term::Constant(Value::VInt(2)))))]))))]))))]))]));
+    let desired = Value::VFunc(Box::new(env.new_child()), vec![("a".to_string(), Type::IntType)], Box::new(ast));
+    env.insert("fib".to_string(), desired.clone());
+    let (_ast, result) = test_helper("samples/return_function.frho".to_string());
+    match result {
+        Value::VFunc(env, params , block) => match desired {
+            Value::VFunc(denv, dparams, dblock) => {
+                assert_eq!(env.keys(), denv.keys());
+                assert_eq!(params, dparams);
+                assert_eq!(block, dblock);
+            },
+            _ => assert!(false),
+        },
+        _ => assert!(false),
+    }
+}

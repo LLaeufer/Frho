@@ -1,2 +1,2 @@
-LET answer = 40 + 2;
+let answer = 40 + 2;
 answer

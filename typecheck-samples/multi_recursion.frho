@@ -1,3 +1,3 @@
-FUN count_a (a: INT, count_b: FUNCTION (INT) (INT)) : INT IF (a == 10) a ELSE CALL count_b(a+1);
-FUN count_b (a: INT ) : INT IF (a == 50) a ELSE CALL count_a(a+1, count_b);
-CALL count_a(0, count_b)
+fun count_a (a: INT, count_b: FUNCTION (INT) (INT)) : INT (if (a == 10) then (a) else (count_b(a+1)));
+fun count_b (a: INT ) : INT (if (a == 50) then (a) else (count_a(a+1, count_b)));
+count_a(0, count_b)

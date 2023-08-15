@@ -1,6 +1,7 @@
 use crate::environment::*;
 use crate::values::*;
 use crate::evaluation::*;
+use crate::types::*;
 
 use std::collections::HashSet;
 use std::collections::HashMap;
@@ -9,9 +10,21 @@ pub trait FrhoEqual {
     fn equal(&self, second: &Self) -> bool;
 }
 
-pub fn tuple_to_map(tup: Vec<(Var, Value)>) -> HashMap<Var, Value> {
-    tup.into_iter().collect()
+macro_rules! tuple_to_map {
+    ($name:ident, $typ:ident) => {
+        pub fn $name(tup: Vec<(String, $typ)>) -> HashMap<String, $typ> {
+            tup.into_iter().collect()
+        } 
+    };
 }
+
+tuple_to_map!(value_tuple_to_map, Value);
+tuple_to_map!(type_tuple_to_map, Type);
+tuple_to_map!(field_occ_tuple_to_map, FieldOccurrence);
+
+/*pub fn tuple_to_map(tup: Vec<(Var, Value)>) -> HashMap<Var, Value> {
+    tup.into_iter().collect()
+}*/
 
 pub fn string_to_str(input: &String) -> &str {
     let slice: &str = &*input;

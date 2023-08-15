@@ -217,12 +217,19 @@ impl LogicTermUtils for LogicTerm {
                     Type::IntType => match $second {
                         Type::IntType => Type::IntType,
                         Type::FloatType => Type::FloatType,
+                        Type::YetUnknownRecursiveType => Type::YetUnknownRecursiveType,
                         _ => Type::IllegalType,
                     },
                     Type::FloatType => match $second {
                         Type::IntType => Type::FloatType,
                         Type::FloatType => Type::FloatType,
+                        Type::YetUnknownRecursiveType => Type::FloatType,
                         _ => Type::IllegalType,
+                    },
+                    Type::YetUnknownRecursiveType => match $second {
+                        Type::IntType => Type::YetUnknownRecursiveType,
+                        Type::FloatType => Type::FloatType,
+                        _ => Type::YetUnknownRecursiveType,
                     },
                     _ => Type::IllegalType
                 }
@@ -242,6 +249,7 @@ impl LogicTermUtils for LogicTerm {
                         Type::FloatType => Type::BoolType,
                         _ => Type::IllegalType,
                     },
+                    Type::YetUnknownRecursiveType => Type::BoolType,
                     _ => Type::IllegalType
                 }
             };
@@ -252,22 +260,30 @@ impl LogicTermUtils for LogicTerm {
                 Type::IntType => Type::IntType,
                 Type::BoolType => Type::BoolType,
                 Type::FloatType => Type::FloatType,
+                Type::YetUnknownRecursiveType => Type::YetUnknownRecursiveType,
                 _ => Type::IllegalType,
             },
-            LogicTerm::And(_, _) => if first == second && first == &Type::BoolType {return Type::BoolType} else {return Type::IllegalType},
-            LogicTerm::Or(_, _) =>  if first == second && first == &Type::BoolType {return Type::BoolType} else {return Type::IllegalType},
+            LogicTerm::And(_, _) => if (first == second && first == &Type::BoolType) || (first == &Type::YetUnknownRecursiveType) || (second == &              Type::YetUnknownRecursiveType) {return Type::BoolType} else {return Type::IllegalType},
+            LogicTerm::Or(_, _) =>  if (first == second && first == &Type::BoolType) || (first == &Type::YetUnknownRecursiveType) || (second == &           Type::YetUnknownRecursiveType) {return Type::BoolType} else {return Type::IllegalType},
             LogicTerm::Add(_, _) => match first {
                 Type::IntType => match second {
                     Type::IntType => Type::IntType,
                     Type::FloatType => Type::FloatType,
+                    Type::YetUnknownRecursiveType => Type::YetUnknownRecursiveType,
                     _ => Type::IllegalType,
                 },
                 Type::FloatType => match second {
                     Type::IntType => Type::FloatType,
                     Type::FloatType => Type::FloatType,
+                    Type::YetUnknownRecursiveType => Type::FloatType,
                     _ => Type::IllegalType,
                 },
-                Type::StringType => if second == &Type::StringType {return Type::StringType} else {return Type::IllegalType},
+                Type::YetUnknownRecursiveType => match second {
+                    Type::IntType => Type::YetUnknownRecursiveType,
+                    Type::FloatType => Type::FloatType,
+                    _ => Type::YetUnknownRecursiveType,
+                },
+                Type::StringType => if second == &Type::StringType || second == &Type::YetUnknownRecursiveType {return Type::StringType} else {return Type::IllegalType},
                 _ => Type::IllegalType
             },
             LogicTerm::Sub(_, _) => math_type_helper!(first, second),
@@ -297,7 +313,7 @@ impl LogicTermUtils for LogicTerm {
                 LogicTerm::And(_, _) => true,
                 LogicTerm::Or(_, _) => true,
                 LogicTerm::Eql(_, _) => true,
-                _ => true,
+                _ => false,
             },
             Type::FloatType => match self {
                 LogicTerm::And(_, _) => false,
@@ -309,6 +325,7 @@ impl LogicTermUtils for LogicTerm {
                 LogicTerm::Add(_, _) => true,
                 _ => false,
             }
+            Type::YetUnknownRecursiveType => true,
             _ => match self {
                 LogicTerm::Eql(_, _) => true,
                 _ => false,

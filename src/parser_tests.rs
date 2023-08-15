@@ -23,12 +23,12 @@ fn test_value() {
     //let result = ValueParser::new().parse("test").unwrap();
     //assert_eq!(result, Value::VLabel("test".to_string()));
 
-    assert!(ValueParser::new().parse("TRUE").is_ok());
-    let result = ValueParser::new().parse("TRUE").unwrap();
+    assert!(ValueParser::new().parse("true").is_ok());
+    let result = ValueParser::new().parse("true").unwrap();
     assert_eq!(result, Value::VBool(true));
 
-    assert!(ValueParser::new().parse("FALSE").is_ok());
-    let result = ValueParser::new().parse("FALSE").unwrap();
+    assert!(ValueParser::new().parse("false").is_ok());
+    let result = ValueParser::new().parse("false").unwrap();
     assert_eq!(result, Value::VBool(false));
 
 }

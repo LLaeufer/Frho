@@ -38,7 +38,7 @@ pub fn evaluate_program_high_stack_size(parsed: Term) -> Value {
 }
 
 pub fn typecheck_program(parsed: &Term) -> Type {
-    let (_, types) = typecheck(TypeEnvironment::new(), parsed).expect("Error wile execution");
+    let (_, types) = typecheck(false, TypeEnvironment::new(), parsed).expect("Error wile execution");
     types
 }
 

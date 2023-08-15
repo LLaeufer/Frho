@@ -25,36 +25,10 @@ pub type EvalResult = Result<EvaluationResult, EvaluationError>;
 pub type CustomEval<T> = Result<(Environment, T), EvaluationError>;
 pub type CustomEvalResult<T> = Result<T, EvaluationError>;
 
-/*
-fn clean_functions(raw: Eval) -> Eval {
-    let (block_env, block_result) = raw?;
-    
-    if block_result.should_clean() {
-        for key in block_env.keys_at_level() {
-            let value = block_env.get(&key);
-            match value {
-                Some(mut val) => val.clean(),
-                None => {},
-            }
-        }
-    }
-
-    Ok((block_env, block_result))
-}
-*/
-
-
 fn clean_functions(raw: Eval) -> Eval {
     let (mut block_env, block_result) = raw?;
     
     if block_result.should_clean() {
-        /*for key in block_env.keys_at_level() {
-            let value = block_env.get(&key);
-            match value {
-                Some(mut val) => val.clean(),
-                None => {},
-            }
-        }*/
         block_env.remove_parent();
         block_env.cleanup();
     }
@@ -214,7 +188,7 @@ pub fn evaluate_function_call(env: Environment, func_body_location: &Term, param
             Ok((env, evaluate_function_block(&func_env, &body, 
                 map_from_parameter(params.clone(), param_results))?)),
         // Value isn't a function
-        _ => Err(EvaluationError::VariableNotOfDesiredType(maybe_func, Type::FunctionType(vec![], vec![])))
+        _ => Err(EvaluationError::VariableNotOfDesiredType(maybe_func, Type::FunctionType(vec![], Box::new(Type::NoneType))))
     }
 }
 
@@ -251,7 +225,7 @@ pub fn evaluate_record_construction(env: Environment, unevaluated_record: &Vec<R
     }
 
     let (env, variants) = eval_rec_con_rec(env, &unevaluated_record, vec![])?;
-    let map = tuple_to_map(variants);
+    let map = value_tuple_to_map(variants);
     Ok((env, Value::VRecord(map)))
 
 }
@@ -266,10 +240,10 @@ pub fn evaluate_variant_case(env: Environment, variant_block: &Term, desired_lab
     let (env, maybe_variant) = evaluate(env, variant_block)?;
     match maybe_variant {
         Value::VVariant(label, value) => if &label == desired_label {
-            let result = evaluate_function_block(&env, &consequence, tuple_to_map(vec![(consequence_var.clone(), *value.clone())]))?;
+            let result = evaluate_function_block(&env, &consequence, value_tuple_to_map(vec![(consequence_var.clone(), *value.clone())]))?;
             Ok((env, result))
         } else {
-            let result = evaluate_function_block(&env, &alternative, tuple_to_map(vec![(alternative_var.clone(), Value::VVariant(label.clone(), value.clone()))]))?;
+            let result = evaluate_function_block(&env, &alternative, value_tuple_to_map(vec![(alternative_var.clone(), Value::VVariant(label.clone(), value.clone()))]))?;
             Ok((env, result))
         },
         _ => Err(EvaluationError::VariableNotOfDesiredType(maybe_variant, Type::VariantType(vec![])))

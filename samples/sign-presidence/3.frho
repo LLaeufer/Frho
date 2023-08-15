@@ -1,2 +1,2 @@
-LET sample = FALSE && FALSE || TRUE;
+let sample = false && false || true;
 sample

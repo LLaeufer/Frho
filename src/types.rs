@@ -18,8 +18,9 @@ pub enum Type {
     TypeContainerType(Var, Box<Type>),
     RecordsType(Vec<LabelOccurrence>),
     VariantType(Vec<LabelOccurrence>),
-    FunctionType(Vec<Type>, Vec<Type>),
+    FunctionType(Vec<Type>, Box<Type>),
     UnknownType,
+    YetUnknownRecursiveType, // Used if the typechecker isn't aware of the correct type for a recursive function yet
     IllegalType,
 }
 
@@ -45,14 +46,14 @@ fn equal_internal(type_1: &Type, type_2: &Type) -> bool {
                         FieldOccurrence::Present(_typ) => {
                             let second_occurence = second_occurances_map.get(&key);
                             match second_occurence {
-                                Some(snd_occurence) => return occurence == *snd_occurence,
+                                Some(snd_occurence) => if occurence != *snd_occurence {return false},
                                 None => return false,
                             }
                         },
                     }
                 }
 
-                false
+                true
             },
             _ => false,
         },
@@ -66,14 +67,14 @@ fn equal_internal(type_1: &Type, type_2: &Type) -> bool {
                         FieldOccurrence::Present(_typ) => {
                             let second_occurence = second_occurances_map.get(&key);
                             match second_occurence {
-                                Some(snd_occurence) => return occurence == *snd_occurence,
-                                None => return false,
+                                Some(snd_occurence) => if occurence != *snd_occurence {return false},
+                                None => {},
                             }
                         },
                     }
                 }
 
-                false
+                true
             },
             _ => false,
         },
@@ -81,6 +82,55 @@ fn equal_internal(type_1: &Type, type_2: &Type) -> bool {
     }
 }
 
+pub trait OfType {
+    fn is_variant(&self) -> bool;
+    fn is_record(&self) -> bool;
+    fn is_function(&self) -> bool;
+}
+
+impl OfType for Type {
+    fn is_variant(&self) -> bool {
+        match self {
+            Type::VariantType(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_record(&self) -> bool {
+        match self {
+            Type::RecordsType(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_function(&self) -> bool {
+        match self {
+            Type::FunctionType(_, _) => true,
+            _ => false,
+        }
+    }
+}
+
+pub trait TypeUtils {
+    fn get_function_input(&self) -> &Vec<Type>;
+    fn get_function_output(&self) -> &Type;
+}
+
+impl TypeUtils for Type {
+    fn get_function_input(&self) -> &Vec<Type> {
+        match self {
+            Type::FunctionType(input, _) => input,
+            _ => panic!("{} is not a function type", self),
+        }
+    }
+
+    fn get_function_output(&self) -> &Type {
+        match self {
+            Type::FunctionType(_, output) => output,
+            _ => panic!("{} is not a function type", self),
+        }
+    }
+}
 
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -95,9 +145,10 @@ impl fmt::Display for Type {
             Type::AllType => write!(f, "ALL"),
             Type::TypeContainerType(var, typ) => write!(f, "TYPECONTAINER {}: {}", var, typ),
             Type::RecordsType(lab_occ_vec) => write!(f, "RECORD {{{}}}", serialize_label_occurrence_vector(lab_occ_vec)),
-            Type::VariantType(lab_occ_vec) => write!(f, "VARIANT {{{}}}", serialize_label_occurrence_vector(lab_occ_vec)),
-            Type::FunctionType(in_types, out_types) => write!(f, "FUNCTION ({}) ({})", serialize_type_vector(in_types), serialize_type_vector(out_types)),
+            Type::VariantType(lab_occ_vec) => write!(f, "VARIANT [{}]", serialize_label_occurrence_vector(lab_occ_vec)),
+            Type::FunctionType(in_types, out_types) => write!(f, "FUNCTION ({}) ({})", serialize_type_vector(in_types), out_types),
             Type::UnknownType => write!(f, "UNKNOWN"),
+            Type::YetUnknownRecursiveType => write!(f, "YETUNKNOWNRECURSIVETYPE"),
             Type::IllegalType => write!(f, "ILLEGAL"),
         }
     }

@@ -1,1 +1,1 @@
-CASE [ pig: "oink" ] WITH ([swine: x] -> "mpf"; y -> CASE y WITH ([pig: x] -> "yay"; y-> "not found"))
+case [ pig: "oink" ] with ([swine: x] -> "mpf"; y -> case y with ([pig: x] -> "yay"; y-> "not found"))

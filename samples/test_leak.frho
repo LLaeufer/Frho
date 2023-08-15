@@ -1,5 +1,5 @@
-FUN count (a: INT) IF (a == 10) a ELSE (
-    FUN fib (a: INT) IF (a <= 2) 1 ELSE (CALL fib(a-1)+CALL fib(a-2));
-    CALL fib(5);
-    CALL count(a+1));
-CALL count(0)
+fun count (a: INT) (if (a == 10) then (a) else (
+    fun fib (a: INT) (if (a <= 2) then (1) else (fib(a-1)+fib(a-2)));
+    fib(5);
+    count(a+1)));
+count(0)

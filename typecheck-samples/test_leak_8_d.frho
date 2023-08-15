@@ -1,2 +1,2 @@
-FUN lam (a: INT) (FUN fib (a: INT) : INT IF (a <= 2) 1 ELSE (CALL fib(a-1)+CALL fib(a-2)); CALL fib(a));
-CALL lam(5)
+fun lambda (a: INT) (fun fib (a: INT) : INT (if (a <= 2) then (1) else (fib(a-1)+fib(a-2))); fib(a));
+lambda(5)

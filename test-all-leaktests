@@ -1,0 +1,26 @@
+#!/usr/bin/python3
+
+import sys
+import os
+
+os.system("rm -r memorylogs")
+os.system("mkdir memorylogs")
+
+targets =  ["test_leak.frho", 
+            "test_leak_2.frho",
+            "test_leak_3.frho",
+            "test_leak_4.frho",
+            "test_leak_5.frho",
+            "test_leak_6.frho",
+            "test_leak_7.frho",
+            "test_leak_8_a.frho",
+            "test_leak_8_b.frho",
+            "test_leak_8_c.frho",
+            "test_leak_8_d.frho",
+            "test_leak_8_e.frho"]
+
+for target in targets:
+    os.system("./test-leaks debug samples/"+target)
+    os.system("cp memorylog.txt memorylogs/"+target+".txt")
+
+

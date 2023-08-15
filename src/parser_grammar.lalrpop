@@ -20,7 +20,7 @@ use crate::parser_helper::*;
 grammar;
 
 pub Expr: Term = { 
-    "LET" <l: Label> "=" <t: Expr> => Term::Let(l, Box::new(t)),
+    "let" <l: Label> "=" <t: Expr> => Term::Let(l, Box::new(t)),
     OrTerm, };
 
 OrTerm: Term = {
@@ -35,6 +35,7 @@ AndTerm: Term = {
 
 NotTerm: Term = {
     "!" <t:NotTerm> => Term::LogicGate(LogicTerm::Not(Box::new(t))),
+    "-" <t:Term> => Term::LogicGate(LogicTerm::Not(Box::new(t))),
     ComparandTerm,
 }
 
@@ -65,28 +66,43 @@ pub Term: Term = {
     "{" "}" => Term::RecordConstruction(vec![]),
     "{" <e: Elements> "}" => Term::RecordConstruction(e),
     "[" <e: Element> "]" => Term::VariantConstruction(e),
-    "SEL" <t:Term> "." <l: Label> => Term::RecordSelection(Box::new(t), l),
-    "UP" <t: Term> "." <l: Label> "=" <u: Term> => Term::RecordUpdate(Box::new(t), l, Box::new(u)),
-    "IF"  <decider: Term> <consequence: Term> "ELSE" <alternative: Term>  => Term::If(Box::new(decider), Box::new(consequence), Box::new(alternative)),
-    "FUN" <l: Label> "(" <ls: LabelTypes> ")" <block: Term> => Term::Function(l, None, ls, Box::new(block)),
-    "FUN" <l: Label> "(" ")" <block: Term> => Term::Function(l, None, vec![], Box::new(block)),
-    "REC" <l: Label> "(" <ls: LabelTypes> ")" <block: Term> => Term::RecursiveAnonymousFunction(l, None, ls, Box::new(block)),
-    "REC" <l: Label> "(" ")" <block: Term> => Term::RecursiveAnonymousFunction(l, None, vec![], Box::new(block)),
-    "FUN" <l: Label> "(" <ls: LabelTypes> ")" ":" <t:Type> <block: Term> => Term::Function(l, Some(t), ls, Box::new(block)),
-    "FUN" <l: Label> "(" ")" ":" <t:Type> <block: Term> => Term::Function(l, Some(t), vec![], Box::new(block)),
-    "REC" <l: Label> "(" <ls: LabelTypes> ")" ":" <t:Type> <block: Term> => Term::RecursiveAnonymousFunction(l, Some(t), ls, Box::new(block)),
-    "REC" <l: Label> "(" ")" ":" <t:Type> <block: Term> => Term::RecursiveAnonymousFunction(l, Some(t), vec![], Box::new(block)),
-    "LAM" "(" <ls: LabelTypes> ")" <block: Term> => Term::AnonymousFunction(ls, Box::new(block)),
-    "LAM" "(" ")" <block: Term> => Term::AnonymousFunction(vec![], Box::new(block)),
-    "CALL" <t:Term> "(" <ts: Terms> ")" => Term::FunctionCall(Box::new(t), ts),
-    "CALL" <t:Term> "(" ")" => Term::FunctionCall(Box::new(t), vec![]),
-    "WRAP" "<" <tv: TypeVariable> ":" <tps: Type> ">" <t: Term> => Term::BigLambda(tv, tps, Box::new(t)),
-    "UNWRAP" "<" <tv: TypeVariable> ">" <t: Term> => Term::TypeApplication(Box::new(t), tv),
-    "CASE" <t: Term> "WITH" "(" "[" <l: Label> ":" <vc: Label> "]" "->" <c: Term> ";" <va: Label> "->" <a: Term> ")" => Term::VariantCase(Box::new(t), l, vc, Box::new(c), va, Box::new(a)),
-    "PROMISE" "<" <t: Type> ">" <ts: TermBlock> => Term::Promise(t, Box::new(Term::Block(ts))),
-    "PRINT" <t: Term> => Term::Print(Box::new(t)),
+    <t:Label> "." <l: Label> => Term::RecordSelection(Box::new(Term::Variable(t)), l),
+    <t:TermBlock> "." <l: Label> => Term::RecordSelection(Box::new(Term::Block(t)), l),
+    <t: Label> "." <l: Label> "<-" <u: Term> => Term::RecordUpdate(Box::new(Term::Variable(t)), l, Box::new(u)),
+    <t: TermBlock> "." <l: Label> "<-" <u: Term> => Term::RecordUpdate(Box::new(Term::Block(t)), l, Box::new(u)),
+    "if" <decider: TermBlock> "then" <consequence: TermBlock> "else" <alternative: TermBlock>  => Term::If(Box::new(Term::Block(decider)), Box::new(Term::Block(consequence)), Box::new(Term::Block(alternative))),
+    
+    FunctionTerm,
+
+    FunctionCallTerm,
+
+    "wrap" "<" <tv: TypeVariable> ":" <tps: Type> ">" <t: Term> => Term::BigLambda(tv, tps, Box::new(t)),
+    "unwrap" "<" <tv: TypeVariable> ">" <t: Term> => Term::TypeApplication(Box::new(t), tv),
+    "case" <t: Term> "with" "(" "[" <l: Label> ":" <vc: Label> "]" "->" <c: Term> ";" <va: Label> "->" <a: Term> ")" => Term::VariantCase(Box::new(t), l, vc, Box::new(c), va, Box::new(a)),
+    "promise" "<" <t: Type> ">" <ts: TermBlock> => Term::Promise(t, Box::new(Term::Block(ts))),
+    "print" <t: Term> => Term::Print(Box::new(t)),
+
     <ts: TermBlock> => Term::Block(ts),
-    // "(" <t:Expr> ")" => t,
+}
+
+FunctionTerm: Term = {
+    "fun" <l: Label> "(" <ls: LabelTypes> ")" <block: TermBlock> => Term::Function(l, None, ls, Box::new(Term::Block(block))),
+    "fun" <l: Label> "(" ")" <block: TermBlock> => Term::Function(l, None, vec![], Box::new(Term::Block(block))),
+    "rec" <l: Label> "(" <ls: LabelTypes> ")" <block: TermBlock> => Term::RecursiveAnonymousFunction(l, None, ls, Box::new(Term::Block(block))),
+    "rec" <l: Label> "(" ")" <block: TermBlock> => Term::RecursiveAnonymousFunction(l, None, vec![], Box::new(Term::Block(block))),
+    "fun" <l: Label> "(" <ls: LabelTypes> ")" ":" <t:Type> <block: TermBlock> => Term::Function(l, Some(t), ls, Box::new(Term::Block(block))),
+    "fun" <l: Label> "(" ")" ":" <t:Type> <block: TermBlock> => Term::Function(l, Some(t), vec![], Box::new(Term::Block(block))),
+    "rec" <l: Label> "(" <ls: LabelTypes> ")" ":" <t:Type> <block: TermBlock> => Term::RecursiveAnonymousFunction(l, Some(t), ls, Box::new(Term::Block(block))),
+    "rec" <l: Label> "(" ")" ":" <t:Type> <block: TermBlock> => Term::RecursiveAnonymousFunction(l, Some(t), vec![], Box::new(Term::Block(block))),
+    "lam" "(" <ls: LabelTypes> ")" <block: TermBlock> => Term::AnonymousFunction(ls, Box::new(Term::Block(block))),
+    "lam" "(" ")" <block: TermBlock> => Term::AnonymousFunction(vec![], Box::new(Term::Block(block))),
+};
+
+FunctionCallTerm: Term = {
+    <t:Label> "(" <ts: Terms> ")" => Term::FunctionCall(Box::new(Term::Variable(t)), ts),
+    <t:TermBlock> "(" <ts: Terms> ")" => Term::FunctionCall(Box::new(Term::Block(t)), ts),
+    <t:Label> "(" ")" => Term::FunctionCall(Box::new(Term::Variable(t)), vec![]),
+    <t:TermBlock> "(" ")" => Term::FunctionCall(Box::new(Term::Block(t)), vec![]),
 };
 
 pub TermBlock: TermBlock = {
@@ -116,15 +132,15 @@ Terms: Vec<Term> = {
 pub Value: Value = {
     <s:r"[0-9]+"> => Value::VInt(i32::from_str(s).unwrap()),
     <s:r"[0-9]+\.[0-9]+"> => Value::VFloat(f32::from_str(s).unwrap()),
-    "NONE" => Value::VNone,
+    "none" => Value::VNone,
     <b: Bool> => Value::VBool(b),
     <s:r#""(?:[^"\\]|\\.)*""#> => Value::VString(remove_quotes(s.to_string())), // https://stackoverflow.com/questions/249791/regex-for-quoted-string-with-escaping-quotes
     "$" <l: Label> => Value::VLabel(l),
 };
 
 Bool : bool = {
-    "TRUE" => true,
-    "FALSE" => false,
+    "true" => true,
+    "false" => false,
 };
 
 TypeVariable: String = "$"<s:r"([A-Z]+[A-Z0-9_]*)"> => s.to_string();
@@ -144,10 +160,10 @@ Type: Type = {
     "ALL" => Type::AllType,
     "RECORD" "{" <l: LabelOccurrenceList> "}" => Type::RecordsType(l),
     "VARIANT" "[" <l: LabelOccurrenceList> "]" => Type::VariantType(l),
-    "FUNCTION" "("  ")" "("  ")" => Type::FunctionType(vec![], vec![]),
-    "FUNCTION" "(" ")" "(" <to: TypeList> ")" => Type::FunctionType(vec![], to),
-    "FUNCTION" "(" <ti: TypeList> ")" "("  ")" => Type::FunctionType(ti, vec![]),
-    "FUNCTION" "(" <ti: TypeList> ")" "(" <to: TypeList> ")" => Type::FunctionType(ti, to),
+    "FUNCTION" "("  ")" "("  ")" => Type::FunctionType(vec![], Box::new(Type::NoneType)),
+    "FUNCTION" "(" ")" "(" <to: Type> ")" => Type::FunctionType(vec![], Box::new(to)),
+    "FUNCTION" "(" <ti: TypeList> ")" "("  ")" => Type::FunctionType(ti, Box::new(Type::NoneType)),
+    "FUNCTION" "(" <ti: TypeList> ")" "(" <to: Type> ")" => Type::FunctionType(ti, Box::new(to)),
 };
 
 LabelOccurrenceList: Vec<(Label, FieldOccurrence)> = {

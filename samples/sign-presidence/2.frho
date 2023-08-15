@@ -1,2 +1,2 @@
-LET sample = !FALSE && (TRUE || FALSE) == (!(FALSE || (TRUE && TRUE)));
+let sample = !false && (true || false) == (!(false || (true && true)));
 sample

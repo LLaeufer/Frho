@@ -83,27 +83,27 @@ impl fmt::Display for Term {
                 }
                 write!(f, "({})", ret)
             },
-            Term::Let(label, term) => write!(f, "LET {} = {}", label, format!("{}", term)),
-            Term::If(decider, consequence, alterative) => write!(f, "IF {} {} ELSE {}", decider, consequence, alterative),
+            Term::Let(label, term) => write!(f, "let {} = {}", label, format!("{}", term)),
+            Term::If(decider, consequence, alterative) => write!(f, "if {} then {} else {}", decider, consequence, alterative),
             Term::Function(label, mby_type, parameter, body) => match mby_type {
-                Some(typ) => write!(f, "FUN {} ({}) : {} {}", label, serialize_variant_type_vector(parameter), typ, body),
-                None => write!(f, "FUN {} ({}) {}", label, serialize_variant_type_vector(parameter), body),
+                Some(typ) => write!(f, "fun {} ({}) : {} {}", label, serialize_variant_type_vector(parameter), typ, body),
+                None => write!(f, "fun {} ({}) {}", label, serialize_variant_type_vector(parameter), body),
             },
-            Term::AnonymousFunction(parameter, body) => write!(f, "LAM ({}) {}", serialize_variant_type_vector(parameter), body),
+            Term::AnonymousFunction(parameter, body) => write!(f, "lam ({}) {}", serialize_variant_type_vector(parameter), body),
             Term::RecursiveAnonymousFunction(label, mby_type, parameter, body) => match mby_type {
-                Some(typ) => write!(f, "REC {} ({}) : {} {}", label, serialize_variant_type_vector(parameter), typ, body),
-                None => write!(f, "REC {} ({}) {}", label, serialize_variant_type_vector(parameter), body),
+                Some(typ) => write!(f, "rec {} ({}) : {} {}", label, serialize_variant_type_vector(parameter), typ, body),
+                None => write!(f, "rec {} ({}) {}", label, serialize_variant_type_vector(parameter), body),
             },
-            Term::FunctionCall(term, parameter) => write!(f, "CALL {} ({})", term, serialize_term_vector(parameter)),
-            Term::TypeApplication(term, label) => write!(f, "UNWRAP <${}> {}", label, term),
+            Term::FunctionCall(term, parameter) => write!(f, "{} ({})", term, serialize_term_vector(parameter)),
+            Term::TypeApplication(term, label) => write!(f, "unwrap <${}> {}", label, term),
             Term::RecordConstruction(variant_vec) => write!(f, "{{{}}}", serialize_raw_variant_vector(variant_vec)),
-            Term::RecordUpdate(record, label, value) => write!(f, "UP {}.{} = {}", record, label.clone(), value),
-            Term::RecordSelection(record, label) => write!(f, "SEL {}.{}", record, label.clone()),
+            Term::RecordUpdate(record, label, value) => write!(f, "{}.{} <- {}", record, label.clone(), value),
+            Term::RecordSelection(record, label) => write!(f, "{}.{}", record, label.clone()),
             Term::VariantConstruction(variant) => write!(f, "[{}]", serialize_raw_variant(variant)),
-            Term::VariantCase(term, label, var, consequence , alt_var, alternative) => write!(f, "CASE {} WITH ([{}: {}] -> {}; {} -> {})", term, label, var, consequence, alt_var, alternative),
-            Term::BigLambda(type_var, typ, term) => write!(f, "WRAP <${} : {}> {}", type_var, typ, term),
-            Term::Promise(types, block) => write!(f, "PROMISE <{}> {}", types, block),
-            Term::Print(term) => write!(f, "PRINT {}", term),
+            Term::VariantCase(term, label, var, consequence , alt_var, alternative) => write!(f, "case {} with ([{}: {}] -> {}; {} -> {})", term, label, var, consequence, alt_var, alternative),
+            Term::BigLambda(type_var, typ, term) => write!(f, "wrap <${} : {}> {}", type_var, typ, term),
+            Term::Promise(types, block) => write!(f, "promise <{}> {}", types, block),
+            Term::Print(term) => write!(f, "print {}", term),
         }
 
     }
@@ -117,9 +117,9 @@ crate::vector_serializer!(serialize_term_vector, Term, ", ");
 
 fn serialize_value_for_term(value: &Value) -> String{
     match value {
-        Value::VNone => format!("NONE"),
+        Value::VNone => format!("none"),
         Value::VInt(i) => format!("{}", i),
-        Value::VBool(b) => if *b {"TRUE".to_string()} else {"FALSE".to_string()},
+        Value::VBool(b) => if *b {"true".to_string()} else {"false".to_string()},
         Value::VFloat(fl) => {
             let mut float_string = format!("{}", fl);
             if !float_string.contains(".") {float_string += ".0"}
