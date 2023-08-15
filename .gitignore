@@ -1,5 +1,6 @@
 /target
 *.DS_STORE
+*.DS_Store
 memorylog.txt
 memorylogs/*
 private-resources/*
