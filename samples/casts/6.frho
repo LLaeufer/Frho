@@ -1,0 +1,2 @@
+// CTg_PolyL
+(lam <X: Ty> 7 ): all (X: Ty) int =[+#blame]=> *

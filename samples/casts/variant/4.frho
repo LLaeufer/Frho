@@ -1,0 +1,3 @@
+// Variant
+
+([number: 42] : [number: +int] =[+#blame]=> *): *  =[+#blame2]=> [number: +int, second_entry: +string, third_entry: -]

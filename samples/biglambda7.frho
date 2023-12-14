@@ -1,0 +1,4 @@
+let biglam = lam <Y: Ty> (lam <X: {val, yval}> (lam (x: {val: +int, yval: +Y, X}) : int (x.val + 1)));
+let unwrap = app (biglam) <string>;
+let plus1 = app (unwrap) <{unused: +string}>;
+plus1({val: 41, yval: "Hello", unused: "This is not relevant"})

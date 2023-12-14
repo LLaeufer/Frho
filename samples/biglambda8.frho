@@ -1,0 +1,3 @@
+lam <X: Ty> {label1: 42, label2: (lam (x: int) : [var_label1: +int, var_label2: +X] (
+    ([var_label1: x] : [var_label1: +int]=[+#blame1]=>*): * =[+#blame1]=> [var_label1: +int, var_label2: +X]
+))}

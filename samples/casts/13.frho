@@ -1,0 +1,7 @@
+fun fib (a: int) : int (if (a <= 2) then (1) else (fib(a-1)+fib(a-2)));
+let records = {test: 42, fib5: fib(5), oink: "pig"};
+let casted_records = records : {test: +int, fib5: +int, oink: +string} =[+#blame]=> {test: +int, fib5: +int, *};
+let casted_records2 = casted_records : {test: +int, fib5: +int, *} =[+#blame2]=> {test: +int, fib5: +int, oink: -};
+let casted_records3 = casted_records2 : {test: +int, fib5: +int, oink: -} =[+#blame3]=> {test: +int, fib5: +int, *};
+let casted_records4 = casted_records3 : {test: +int, fib5: +int, *} =[+#blame4]=> {test: +int, fib5: +int, oink: +string};
+casted_records4.oink

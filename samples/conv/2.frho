@@ -1,0 +1,4 @@
+// rho |-conv (VSeal v A alpha) : alpha ~[+alpha] A  -->  v
+
+// Cv_TReveal
+(7 : int ~[-%conv_label]~> %conv_label) : %conv_label ~[+%conv_label]~> int

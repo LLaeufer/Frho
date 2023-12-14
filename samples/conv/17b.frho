@@ -1,0 +1,6 @@
+let type_lam = lam <X: {val, val2}> (lam (x: [val: +int, val2: +int, X]) : int (case x with ([val: myval] -> (myval + 1); y -> case y with ([val2: myval] -> (myval - 1); y -> 0))));
+let converted_type_lam = type_lam : all (X: {val, val2}) ([val: +int, val2: +int, X])->(int) ~[-%conv_label]~> all (X: {val, val2}) ([val: +int, val2: +%conv_label, X])->(int);
+let converted_and_applied = app (converted_type_lam) <[other_val: +float]>;
+let casted_variant = ([val: 41] : [val: +int] =[+#blame]=> *) : * =[+#blame2]=> [val: +int, val2: +int, other_val: +float];
+let applied = converted_and_applied: ([val: +int, val2: +%conv_label, other_val: +float])->(int) ~[+%conv_label]~> ([val: +int, val2: +int, other_val: +float])->(int);
+applied(casted_variant)

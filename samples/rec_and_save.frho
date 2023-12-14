@@ -1,0 +1,8 @@
+fun runTwiceAndAdd(inrec: {target: +(int)->(int), param: +int}) : int (
+    let target = inrec.target;
+    let param = inrec.param;
+    let val1 = target(param);
+    let val2 = target(param);
+    val1 + val2
+    );
+runTwiceAndAdd({target: rec fib (a: int) : int (if (a <= 2) then (1) else ((fib(a-1)+fib(a-2)))), param: 10})

@@ -20,7 +20,7 @@ targets =  ["test_leak.frho",
             "test_leak_8_e.frho"]
 
 for target in targets:
-    os.system("./test-leaks debug2 samples/"+target)
+    os.system("./test-leaks evaluation-debug2 samples/"+target)
     os.system("cp memorylog.txt memorylogs/"+target+".txt")
 
 

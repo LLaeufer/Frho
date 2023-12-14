@@ -1,4 +1,4 @@
-fun fib (a: INT) (if (a <= 2) then (1) else (fib(a-1)+fib(a-2)));
-fun count (a: INT, prev: FUNCTION (INT) (INT)) (if (a == 10) then (prev) else (count(a+1, prev)));
-let myfib = count(0, fib);
+fun fib (a: int) : int (if (a <= 2) then (1) else (fib(a-1)+fib(a-2)));
+fun count (inrec: {a: +int, prev: +(int)->(int)}) : (int)->(int) (if (inrec.a == 10) then (inrec.prev) else (count({a: inrec.a+1, prev: inrec.prev})));
+let myfib = count({a: 0, prev: fib});
 myfib(5)

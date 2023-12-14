@@ -1,2 +1,2 @@
-fun count (a: INT) (if (a == 100) then (a) else (count(a+1)));
+fun count (a: int) : int (if (a == 100) then (a) else (count(a+1)));
 count(0)

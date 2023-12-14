@@ -1,2 +1,1 @@
-fun test(x: VARIANT [pig: +STRING, number: +INT, oink: -]) (case x with ([pig: x] -> 0; y -> case y with ([number: x] -> x; y -> (-1))));
-test([number: 42])
+case [number: 42] with ([pig: x] -> 0; y -> case y with ([number: x] -> x; y -> (-1)))

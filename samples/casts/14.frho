@@ -1,0 +1,6 @@
+fun fib (a: int) : int (if (a <= 2) then (1) else (fib(a-1)+fib(a-2)));
+let records = {test: 42, fib5: fib(5), oink: "pig"};
+let dyn_records = records : {test: +int, fib5: +int, oink: +string} =[+#blame]=> *;
+let casted_records = dyn_records : * =[+#blame2]=> {test: +int, fib5: +int, oink: +string};
+let casted_records2 = casted_records.oink <- 42.1;
+casted_records2

@@ -1,0 +1,5 @@
+// ------------------------------------------------------- A is a base type
+// rho |-conv v : A ~[-alpha]~> alpha --> VSeal v A alpha
+
+// Cv_TConceal
+7 : int ~[-%conv_label]~> %conv_label

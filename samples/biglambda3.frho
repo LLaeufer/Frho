@@ -1,0 +1,3 @@
+let biglam = lam <X: {val}> (lam (x: {val: +int, X}) : int (x.val + 1));
+let plus1 = app (biglam) <{unused: +string}>;
+plus1({val: 41, unused: "This is not relevant"})

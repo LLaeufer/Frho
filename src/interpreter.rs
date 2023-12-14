@@ -9,9 +9,10 @@ use crate::evaluation::evaluate;
 use crate::utils::*;
 use crate::types::*;
 use crate::typechecker::*;
+use crate::parser_preprocessor::*;
 
 pub fn load_program_text(path: String) -> String {
-    fs::read_to_string(path).expect("File not found!")
+    remove_comments(fs::read_to_string(path).expect("File not found!"))
 }
 
 pub fn parse_program_text(program: String) -> Term {
@@ -38,14 +39,13 @@ pub fn evaluate_program_high_stack_size(parsed: Term) -> Value {
 }
 
 pub fn typecheck_program(parsed: &Term) -> Type {
-    let (_, types) = typecheck(false, TypeEnvironment::new(), parsed).expect("Error wile execution");
+    let (_, types) = typecheck(TypeEnvironment::new(), parsed).expect("Error wile execution");
     types
 }
 
 pub fn cleanup_after_evaluation(val: Value) {
     let mut val = val;
     val.deep_clean();
-    // println!("{}", val);
 }
 
 pub fn reconstruct_source_from_ast(ast: &Term) -> String {

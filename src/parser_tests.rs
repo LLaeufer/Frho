@@ -19,10 +19,6 @@ fn test_value() {
     let result = ValueParser::new().parse("\"Test\"").unwrap();
     assert_eq!(result, Value::VString("Test".to_string()));
 
-    //assert!(ValueParser::new().parse("test").is_ok());
-    //let result = ValueParser::new().parse("test").unwrap();
-    //assert_eq!(result, Value::VLabel("test".to_string()));
-
     assert!(ValueParser::new().parse("true").is_ok());
     let result = ValueParser::new().parse("true").unwrap();
     assert_eq!(result, Value::VBool(true));
@@ -42,7 +38,6 @@ fn test_terms() {
 
     assert!(TermParser::new().parse("{ test: 42 }").is_ok());
     let result = TermParser::new().parse("{ test: 42 }").unwrap();
-    // let vrecordmap = tuple_to_map(vec![("test".to_string(), Value::VInt(42))]);
     assert_eq!(result, Term::RecordConstruction(vec![("test".to_string(), Box::new(Term::Constant(Value::VInt(42))))]));
 
     assert!(TermParser::new().parse("{ test: 42, oink: \"pig\" }").is_ok());
@@ -59,19 +54,11 @@ fn test_unbracketed_term_block() {
     assert!(UnbracketedTermBlockParser::new().parse("7;").is_ok());
     let result = UnbracketedTermBlockParser::new().parse("7;").unwrap();
     assert_eq!(result, Arc::new(vec![Term::Constant(Value::VInt(7))]));
-
-    //assert!(UnbracketedTermBlockParser::new().parse("LET oink = \"pig\";").is_ok());
-    //let result = UnbracketedTermBlockParser::new().parse("LET oink = \"pig\";").unwrap();
-    //assert_eq!(result, Arc::new(vec![Term::Let("oink".to_string(), Arc::new(vec![Term::Constant(Value::VString("pig".to_string()))]))]));
-
     
 }
 
 #[test]
 fn test_term_block() {
-    //assert!(TermBlockParser::new().parse("7").is_ok());
-    //let result = TermBlockParser::new().parse("7").unwrap();
-    //assert_eq!(result, Arc::new(vec![Term::Constant(Value::VInt(7))]));
 
 
     assert!(TermBlockParser::new().parse("(7;)").is_ok());

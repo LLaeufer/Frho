@@ -1,0 +1,1 @@
+case [pig: "oink"] with ([pig: x] -> 0; y -> case y with ([number: x] -> x; y -> (-1)))

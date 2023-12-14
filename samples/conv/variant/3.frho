@@ -1,0 +1,1 @@
+(([number: 42] : [number: +int] =[+#blame]=> *): *  =[+#blame2]=> [number: +int, second_entry: +string, third_entry: -]) : [number: +int, second_entry: +string, third_entry: -]  ~[-%conv_label]~> [number: +int, second_entry: +%conv_label, third_entry: -]

@@ -1,2 +1,2 @@
-fun count (x: INT) (if (x == 0) then ("ZERO") else (if (x == 1) then ("ONE") else ("MANY")));
+fun count (x: int) (if (x == 0) then ("ZERO") else (if (x == 1) then ("ONE") else ("MANY")));
 count

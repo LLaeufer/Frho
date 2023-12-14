@@ -1,0 +1,3 @@
+let biglam = lam <X: Ty> (lam (x: X) : {} ({}));
+let make_it_disappear = app (biglam) <int>;
+make_it_disappear(42)

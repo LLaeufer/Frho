@@ -19,9 +19,6 @@ pub fn match_bool(s: String) -> Value {
     Value::VBool(false)
 
 }
-//pub fn record_from_elements(s: Vec<(String, Value)>) -> Value {
-//    Value::VRecord(tuple_to_map(s))
-//}
 
 macro_rules! merge_helper {
     ($name:ident, $types:ident) => {
@@ -44,8 +41,6 @@ merge_helper!(merge_occurences, LabelOccurrence);
 merge_helper!(merge_variant_types, VariantType);
 
 pub fn element_to_variant(e: (String, Box<Term>)) -> Term {
-    // let (lab, val) = e;
-    // Value::VVariant(lab.clone(), Box::new(val.clone()))
     Term::VariantConstruction(e)
 }
 

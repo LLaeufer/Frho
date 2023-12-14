@@ -1,0 +1,5 @@
+// rho |-conv v : (all <X:K> A1) ~[+/-alpha]~> (all <X:K> A2)
+//  --> lam <X:K> (v <X> : A1 ~[+/-alpha]~> A2)
+
+// Cv_Poly
+(lam <X: Ty> 7 ): all (X: Ty) int ~[-%alpha]~> all (X: Ty) %alpha

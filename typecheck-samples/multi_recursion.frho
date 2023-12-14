@@ -1,3 +1,3 @@
-fun count_a (a: INT, count_b: FUNCTION (INT) (INT)) : INT (if (a == 10) then (a) else (count_b(a+1)));
-fun count_b (a: INT ) : INT (if (a == 50) then (a) else (count_a(a+1, count_b)));
-count_a(0, count_b)
+fun count_a (inrec: {a: +int, count_b: +(int)->(int)}) : int (if (inrec.a == 10) then (inrec.a) else (inrec.count_b(inrec.a+1)));
+fun count_b (a: int ) : int (if (a == 50) then (a) else (count_a({a: a+1, count_b: count_b})));
+count_a({a: 0, count_b: count_b})

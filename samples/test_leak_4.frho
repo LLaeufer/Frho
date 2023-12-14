@@ -1,7 +1,7 @@
-fun one () (1);
-fun count (a: INT, prev: FUNCTION () (INT)) (if (a == 10) then (prev) else (
-    fun plus_one(with_fun: FUNCTION () (INT)) (1 + with_fun());
-    fun combine() (plus_one(prev));
-    count(a+1, combine)
+fun one (x: {}) : int (1);
+fun count (inrec: {a: +int, prev: +({})->(int)}) : ({})->(int) (if (inrec.a == 10) then (inrec.prev) else (
+    fun plus_one(with_fun: ({})->(int)) : int (1 + with_fun({}));
+    fun combine(x: {}) : int (plus_one(inrec.prev));
+    count({a: inrec.a+1, prev: combine})
 ));
-count(0, one)
+count({a: 0, prev: one})

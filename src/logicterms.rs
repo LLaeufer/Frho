@@ -10,6 +10,25 @@ pub enum InvalidValueTranslation {
     Unimplemented(),
 }
 
+impl ReplaceType for LogicTerm {
+    fn replace_type(&self, target: &Type, new: &Type) -> Self {
+        match self {
+            LogicTerm::Not(term) => LogicTerm::Not(Box::new(term.replace_type(target, new))),
+            LogicTerm::And(term1, term2) => LogicTerm::And(Box::new(term1.replace_type(target, new)), Box::new(term2.replace_type(target, new))),
+            LogicTerm::Or(term1, term2) => LogicTerm::Or(Box::new(term1.replace_type(target, new)), Box::new(term2.replace_type(target, new))),
+            LogicTerm::Add(term1, term2) => LogicTerm::Add(Box::new(term1.replace_type(target, new)), Box::new(term2.replace_type(target, new))),
+            LogicTerm::Sub(term1, term2) => LogicTerm::Sub(Box::new(term1.replace_type(target, new)), Box::new(term2.replace_type(target, new))),
+            LogicTerm::Mul(term1, term2) => LogicTerm::Mul(Box::new(term1.replace_type(target, new)), Box::new(term2.replace_type(target, new))),
+            LogicTerm::Div(term1, term2) => LogicTerm::Div(Box::new(term1.replace_type(target, new)), Box::new(term2.replace_type(target, new))),
+            LogicTerm::Eql(term1, term2) => LogicTerm::Eql(Box::new(term1.replace_type(target, new)), Box::new(term2.replace_type(target, new))),
+            LogicTerm::GrT(term1, term2) => LogicTerm::GrT(Box::new(term1.replace_type(target, new)), Box::new(term2.replace_type(target, new))),
+            LogicTerm::LsT(term1, term2) => LogicTerm::LsT(Box::new(term1.replace_type(target, new)), Box::new(term2.replace_type(target, new))),
+            LogicTerm::GrE(term1, term2) => LogicTerm::GrE(Box::new(term1.replace_type(target, new)), Box::new(term2.replace_type(target, new))),
+            LogicTerm::LsE(term1, term2) => LogicTerm::LsE(Box::new(term1.replace_type(target, new)), Box::new(term2.replace_type(target, new))),
+        }
+    }
+}
+
 macro_rules! generic_value_function_template_with_passthrough {
     ($value_type_int:ident, $value_type_float:ident, $func_name:ident, $logic_function:tt, $passthrough:ident) => {
         fn $func_name(&self, second: Value) -> Result<Value, InvalidValueTranslation> {
@@ -211,27 +230,31 @@ impl LogicTermUtils for LogicTerm {
     }
 
     fn resulting_type(&self, first: &Type, second: &Type) -> Type {
+        // If one of the types is the Dynamic Type simply return the dynamic type
+        if first == &Type::DynType || second == &Type::DynType {return Type::DynType;}
+
+
         macro_rules! math_type_helper {
             ($first:ident, $second:ident) => {
                 match $first {
-                    Type::IntType => match $second {
-                        Type::IntType => Type::IntType,
-                        Type::FloatType => Type::FloatType,
-                        Type::YetUnknownRecursiveType => Type::YetUnknownRecursiveType,
-                        _ => Type::IllegalType,
+                    Type::BaseType(BaseType::IntType) => match $second {
+                        Type::BaseType(BaseType::IntType) => Type::BaseType(BaseType::IntType),
+                        Type::BaseType(BaseType::FloatType) => Type::BaseType(BaseType::FloatType),
+                        Type::TechnicalType(TechnicalType::YetUnknownRecursiveType) => Type::TechnicalType(TechnicalType::YetUnknownRecursiveType),
+                        _ => Type::TechnicalType(TechnicalType::IllegalType),
                     },
-                    Type::FloatType => match $second {
-                        Type::IntType => Type::FloatType,
-                        Type::FloatType => Type::FloatType,
-                        Type::YetUnknownRecursiveType => Type::FloatType,
-                        _ => Type::IllegalType,
+                    Type::BaseType(BaseType::FloatType) => match $second {
+                        Type::BaseType(BaseType::IntType) => Type::BaseType(BaseType::FloatType),
+                        Type::BaseType(BaseType::FloatType) => Type::BaseType(BaseType::FloatType),
+                        Type::TechnicalType(TechnicalType::YetUnknownRecursiveType) => Type::BaseType(BaseType::FloatType),
+                        _ => Type::TechnicalType(TechnicalType::IllegalType),
                     },
-                    Type::YetUnknownRecursiveType => match $second {
-                        Type::IntType => Type::YetUnknownRecursiveType,
-                        Type::FloatType => Type::FloatType,
-                        _ => Type::YetUnknownRecursiveType,
+                    Type::TechnicalType(TechnicalType::YetUnknownRecursiveType) => match $second {
+                        Type::BaseType(BaseType::IntType) => Type::TechnicalType(TechnicalType::YetUnknownRecursiveType),
+                        Type::BaseType(BaseType::FloatType) => Type::BaseType(BaseType::FloatType),
+                        _ => Type::TechnicalType(TechnicalType::YetUnknownRecursiveType),
                     },
-                    _ => Type::IllegalType
+                    _ => Type::TechnicalType(TechnicalType::IllegalType)
                 }
             };
         }
@@ -239,57 +262,57 @@ impl LogicTermUtils for LogicTerm {
         macro_rules! comp_type_helper {
             ($first:ident, $second:ident) => {
                 match $first {
-                    Type::IntType => match $second {
-                        Type::IntType => Type::BoolType,
-                        Type::FloatType => Type::BoolType,
-                        _ => Type::IllegalType,
+                    Type::BaseType(BaseType::IntType) => match $second {
+                        Type::BaseType(BaseType::IntType) => Type::BaseType(BaseType::BoolType),
+                        Type::BaseType(BaseType::FloatType) => Type::BaseType(BaseType::BoolType),
+                        _ => Type::TechnicalType(TechnicalType::IllegalType),
                     },
-                    Type::FloatType => match $second {
-                        Type::IntType => Type::BoolType,
-                        Type::FloatType => Type::BoolType,
-                        _ => Type::IllegalType,
+                    Type::BaseType(BaseType::FloatType) => match $second {
+                        Type::BaseType(BaseType::IntType) => Type::BaseType(BaseType::BoolType),
+                        Type::BaseType(BaseType::FloatType) => Type::BaseType(BaseType::BoolType),
+                        _ => Type::TechnicalType(TechnicalType::IllegalType),
                     },
-                    Type::YetUnknownRecursiveType => Type::BoolType,
-                    _ => Type::IllegalType
+                    Type::TechnicalType(TechnicalType::YetUnknownRecursiveType) => Type::BaseType(BaseType::BoolType),
+                    _ => Type::TechnicalType(TechnicalType::IllegalType)
                 }
             };
         }
 
         match self {
             LogicTerm::Not(_) => match first {
-                Type::IntType => Type::IntType,
-                Type::BoolType => Type::BoolType,
-                Type::FloatType => Type::FloatType,
-                Type::YetUnknownRecursiveType => Type::YetUnknownRecursiveType,
-                _ => Type::IllegalType,
+                Type::BaseType(BaseType::IntType) => Type::BaseType(BaseType::IntType),
+                Type::BaseType(BaseType::BoolType) => Type::BaseType(BaseType::BoolType),
+                Type::BaseType(BaseType::FloatType) => Type::BaseType(BaseType::FloatType),
+                Type::TechnicalType(TechnicalType::YetUnknownRecursiveType) => Type::TechnicalType(TechnicalType::YetUnknownRecursiveType),
+                _ => Type::TechnicalType(TechnicalType::IllegalType),
             },
-            LogicTerm::And(_, _) => if (first == second && first == &Type::BoolType) || (first == &Type::YetUnknownRecursiveType) || (second == &              Type::YetUnknownRecursiveType) {return Type::BoolType} else {return Type::IllegalType},
-            LogicTerm::Or(_, _) =>  if (first == second && first == &Type::BoolType) || (first == &Type::YetUnknownRecursiveType) || (second == &           Type::YetUnknownRecursiveType) {return Type::BoolType} else {return Type::IllegalType},
+            LogicTerm::And(_, _) => if (first == second && first == &Type::BaseType(BaseType::BoolType)) || (first == &Type::TechnicalType(TechnicalType::YetUnknownRecursiveType)) || (second == &              Type::TechnicalType(TechnicalType::YetUnknownRecursiveType)) {return Type::BaseType(BaseType::BoolType)} else {return Type::TechnicalType(TechnicalType::IllegalType)},
+            LogicTerm::Or(_, _) =>  if (first == second && first == &Type::BaseType(BaseType::BoolType)) || (first == &Type::TechnicalType(TechnicalType::YetUnknownRecursiveType)) || (second == &           Type::TechnicalType(TechnicalType::YetUnknownRecursiveType)) {return Type::BaseType(BaseType::BoolType)} else {return Type::TechnicalType(TechnicalType::IllegalType)},
             LogicTerm::Add(_, _) => match first {
-                Type::IntType => match second {
-                    Type::IntType => Type::IntType,
-                    Type::FloatType => Type::FloatType,
-                    Type::YetUnknownRecursiveType => Type::YetUnknownRecursiveType,
-                    _ => Type::IllegalType,
+                Type::BaseType(BaseType::IntType) => match second {
+                    Type::BaseType(BaseType::IntType) => Type::BaseType(BaseType::IntType),
+                    Type::BaseType(BaseType::FloatType) => Type::BaseType(BaseType::FloatType),
+                    Type::TechnicalType(TechnicalType::YetUnknownRecursiveType) => Type::TechnicalType(TechnicalType::YetUnknownRecursiveType),
+                    _ => Type::TechnicalType(TechnicalType::IllegalType),
                 },
-                Type::FloatType => match second {
-                    Type::IntType => Type::FloatType,
-                    Type::FloatType => Type::FloatType,
-                    Type::YetUnknownRecursiveType => Type::FloatType,
-                    _ => Type::IllegalType,
+                Type::BaseType(BaseType::FloatType) => match second {
+                    Type::BaseType(BaseType::IntType) => Type::BaseType(BaseType::FloatType),
+                    Type::BaseType(BaseType::FloatType) => Type::BaseType(BaseType::FloatType),
+                    Type::TechnicalType(TechnicalType::YetUnknownRecursiveType) => Type::BaseType(BaseType::FloatType),
+                    _ => Type::TechnicalType(TechnicalType::IllegalType),
                 },
-                Type::YetUnknownRecursiveType => match second {
-                    Type::IntType => Type::YetUnknownRecursiveType,
-                    Type::FloatType => Type::FloatType,
-                    _ => Type::YetUnknownRecursiveType,
+                Type::TechnicalType(TechnicalType::YetUnknownRecursiveType) => match second {
+                    Type::BaseType(BaseType::IntType) => Type::TechnicalType(TechnicalType::YetUnknownRecursiveType),
+                    Type::BaseType(BaseType::FloatType) => Type::BaseType(BaseType::FloatType),
+                    _ => Type::TechnicalType(TechnicalType::YetUnknownRecursiveType),
                 },
-                Type::StringType => if second == &Type::StringType || second == &Type::YetUnknownRecursiveType {return Type::StringType} else {return Type::IllegalType},
-                _ => Type::IllegalType
+                Type::BaseType(BaseType::StringType) => if second == &Type::BaseType(BaseType::StringType) || second == &Type::TechnicalType(TechnicalType::YetUnknownRecursiveType) {return Type::BaseType(BaseType::StringType)} else {return Type::TechnicalType(TechnicalType::IllegalType)},
+                _ => Type::TechnicalType(TechnicalType::IllegalType)
             },
             LogicTerm::Sub(_, _) => math_type_helper!(first, second),
             LogicTerm::Mul(_, _) => math_type_helper!(first, second),
             LogicTerm::Div(_, _) => math_type_helper!(first, second),
-            LogicTerm::Eql(_, _) => Type::BoolType,
+            LogicTerm::Eql(_, _) => Type::BaseType(BaseType::BoolType),
             LogicTerm::GrT(_, _) => comp_type_helper!(first, second),
             LogicTerm::LsT(_, _) => comp_type_helper!(first, second),
             LogicTerm::GrE(_, _) => comp_type_helper!(first, second),
@@ -298,34 +321,34 @@ impl LogicTermUtils for LogicTerm {
     }
 
     fn legal_types(&self, first: &Type, second: &Type) -> bool {
-        if self.resulting_type(first, second) == Type::IllegalType {false} else {true}
+        if self.resulting_type(first, second) == Type::TechnicalType(TechnicalType::IllegalType) {false} else {true}
     }
 
     fn compatible_operation(&self, typ: &Type) -> bool {
         match typ {
-            Type::IntType => match self {
+            Type::BaseType(BaseType::IntType) => match self {
                 LogicTerm::And(_, _) => false,
                 LogicTerm::Or(_, _) => false,
                 _ => true,
             },
-            Type::BoolType => match self {
+            Type::BaseType(BaseType::BoolType) => match self {
                 LogicTerm::Not(_) => true,
                 LogicTerm::And(_, _) => true,
                 LogicTerm::Or(_, _) => true,
                 LogicTerm::Eql(_, _) => true,
                 _ => false,
             },
-            Type::FloatType => match self {
+            Type::BaseType(BaseType::FloatType) => match self {
                 LogicTerm::And(_, _) => false,
                 LogicTerm::Or(_, _) => false,
                 _ => true,
             },
-            Type::StringType => match self {
+            Type::BaseType(BaseType::StringType) => match self {
                 LogicTerm::Eql(_, _) => true,
                 LogicTerm::Add(_, _) => true,
                 _ => false,
             }
-            Type::YetUnknownRecursiveType => true,
+            Type::TechnicalType(TechnicalType::YetUnknownRecursiveType) => true,
             _ => match self {
                 LogicTerm::Eql(_, _) => true,
                 _ => false,

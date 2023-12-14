@@ -1,2 +1,2 @@
-fun f (a: INT) ((fun fib (a: INT) (if (a <= 2) then (1) else (fib(a-1)+fib(a-2))); fib(a)););
+fun f (a: int) : int ((fun fib (a: int) : int (if (a <= 2) then (1) else (fib(a-1)+fib(a-2))); fib(a)););
 f(5)

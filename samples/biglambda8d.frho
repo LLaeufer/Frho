@@ -1,0 +1,5 @@
+let record_with_lam = lam <X: Ty> {label1: 42, label2: (lam (x: int) : [var_label1: +int, var_label2: +X] (
+    ([var_label1: x] : [var_label1: +int]=[+#blame1]=>*): * =[+#blame1]=> [var_label1: +int, var_label2: +X]
+))};
+let applied = app (record_with_lam) <string>;
+case applied.label2(42) with ([var_label1: x] -> "The answer for everything"; y -> "No answer")

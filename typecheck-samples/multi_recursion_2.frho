@@ -1,3 +1,3 @@
-fun fib (a: INT) : INT (if (a <= 2) then (1) else (fib(a-1)+fib(a-2)));
-fun count_a (a: INT, count_b: FUNCTION (INT) (INT)) : INT (if (a == 10) then (a) else (count_b(a+1)));
-count_a(0, fib)
+fun fib (a: int) : int (if (a <= 2) then (1) else (fib(a-1)+fib(a-2)));
+fun count_a (inrec: {a: +int, count_b: +(int)->(int)}) : int (if (inrec.a == 10) then (inrec.a) else (inrec.count_b(inrec.a+1)));
+count_a({a: 0, count_b: fib})

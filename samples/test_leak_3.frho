@@ -1,3 +1,5 @@
-fun one () (1);
-fun count (a: INT, prev: FUNCTION () (INT)) (if (a == 10) then (prev()) else (count(a+1, prev)));
-count(0, one)
+fun one (x: {}) : int (1);
+fun count (input_record: {a: +int, prev: +({})->(int)}) : int (
+    if (input_record.a == 10) then (input_record.prev({})) else (count({a: input_record.a+1, prev: input_record.prev}))
+);
+count({a: 0, prev: one})

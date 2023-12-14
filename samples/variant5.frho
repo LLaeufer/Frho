@@ -1,0 +1,4 @@
+case [new_message: {text: "Hello", sender_id: 42, message_id: 512}] with ([new_message: x] -> ("A new message: " + x.text); y -> 
+case y with ([reaction: x] -> "A new reaction"; y ->
+case y with ([friend_request: x] -> "We added a friend"; y -> 
+case y with ([message_deletion: x] -> "We deleted a message"; y -> "Error!"))))

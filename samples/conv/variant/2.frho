@@ -1,0 +1,3 @@
+// Variant
+
+([number: 42] : [number: +int] ~[-%conv_label]~> [number: +%conv_label]): [number: +%conv_label] ~[+%conv_label]~> [number: +int]

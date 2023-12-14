@@ -1,0 +1,6 @@
+fun add(record) (
+    let x = record.x;
+    let y = record.y;
+    x + y
+)
+

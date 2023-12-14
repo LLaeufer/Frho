@@ -1,14 +1,11 @@
 use crate::environment::*;
 use crate::values::*;
+use crate::terms::*;
 use crate::evaluation::*;
 use crate::types::*;
 
 use std::collections::HashSet;
 use std::collections::HashMap;
-
-pub trait FrhoEqual {
-    fn equal(&self, second: &Self) -> bool;
-}
 
 macro_rules! tuple_to_map {
     ($name:ident, $typ:ident) => {
@@ -21,6 +18,17 @@ macro_rules! tuple_to_map {
 tuple_to_map!(value_tuple_to_map, Value);
 tuple_to_map!(type_tuple_to_map, Type);
 tuple_to_map!(field_occ_tuple_to_map, FieldOccurrence);
+
+#[macro_export]
+macro_rules! map_to_tuples {
+    ($name:ident, $typ:ident) => {
+        pub fn $name(map: HashMap<String, $typ>) -> Vec<(String, $typ)> {
+            map.into_iter().collect()
+        } 
+    };
+}
+
+crate::map_to_tuples!(field_occ_map_to_tuple, FieldOccurrence);
 
 /*pub fn tuple_to_map(tup: Vec<(Var, Value)>) -> HashMap<Var, Value> {
     tup.into_iter().collect()
@@ -79,7 +87,7 @@ pub fn remove_first_and_last_char_from_string(s: String) -> String {
 #[macro_export]
 macro_rules! vector_serializer {
     ($name:ident, $input_type:ident, $separator:expr) => {
-        fn $name(terms: &Vec<$input_type>) -> String {
+        pub fn $name(terms: &Vec<$input_type>) -> String {
             let mut ret = "".to_string();
             let mut fst = true;
             for term in terms {
@@ -91,10 +99,14 @@ macro_rules! vector_serializer {
     };
 }
 
+crate::vector_serializer!(serialize_type_vector, Type, ",");
+crate::tuple_pair_serializer!(serialize_label_occurrence, LabelOccurrence, ": ");
+crate::vector_serializer!(serialize_label_vector, Label, ",");
+
 #[macro_export]
 macro_rules! vector_serializer_foreign {
     ($name:ident, $input_type:ident, $separator:expr, $serializer:ident) => {
-        fn $name(terms: &Vec<$input_type>) -> String {
+        pub fn $name(terms: &Vec<$input_type>) -> String {
             let mut ret = "".to_string();
             let mut fst = true;
             for term in terms {
@@ -106,16 +118,24 @@ macro_rules! vector_serializer_foreign {
     };
 }
 
+crate::vector_serializer_foreign!(serialize_label_occurrence_vector, LabelOccurrence, ",", serialize_label_occurrence);
+
 #[macro_export]
 macro_rules! tuple_pair_serializer {
     ($name:ident, $pair:ident, $separator:expr) => {
-        fn $name(pair: &$pair) -> String {
+        pub fn $name(pair: &$pair) -> String {
             let (fst, snd) = pair;
             format!("{}", fst) + $separator + &*format!("{}", snd)
         }
     };
 }
 
+pub fn new_types_for_variant_type_vector(vtv: Vec<VariantType>, tv: Vec<Type>) -> Vec<VariantType> {
+    let (names, _): (Vec<_>, Vec<_>) = vtv.into_iter().unzip();
+    names.into_iter().zip(tv).collect::<Vec<_>>()
+}
+
 pub type Var = String;
 pub type Label = String;
 pub type TypeVar = String;
+pub type TypeName = String;

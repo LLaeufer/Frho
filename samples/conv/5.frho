@@ -1,0 +1,5 @@
+//  -------------------------------------------------- if A is a base type
+//  rho |-conv v : A ~[+/-alpha]~> A --> v
+
+// CV_Base
+7 : int ~[-%beta]~> int

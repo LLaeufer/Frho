@@ -1,0 +1,5 @@
+//  -------------------------------------------------- if alpha != beta
+// rho |-conv v : * ~[+/-alpha]~> *  -->  v
+
+// Cv_TName
+(7 : int ~[-%alpha]~> %alpha) : %alpha ~[-%beta]~> %alpha

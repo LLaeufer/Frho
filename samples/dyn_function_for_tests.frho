@@ -1,0 +1,2 @@
+fun times10 (x) (10 * x);
+times10(4.5)

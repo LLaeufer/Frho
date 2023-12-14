@@ -13,7 +13,7 @@ pub type EvaluationResult = Value;
 #[derive(Clone, PartialEq, Debug)]
 pub struct EnvironmentInternal {
     variables: HashMap<Var, Value>,
-    // types: HashMap<Var, Type>,
+    types: HashMap<Var, Type>,
     parent: Option<Arc<RefCell<EnvironmentInternal>>>,
 }
 
@@ -56,7 +56,7 @@ unsafe impl Send for Environment {}
 unsafe impl Sync for Environment {}
 
 macro_rules! env_behavior_helper {
-    ($ext_target:ident, $int_target:ident, $kind:ident, $behavior_name:ident, $get:ident, $insert:ident, $remove:ident, $remove_at_level:ident, $keys_at_level:ident, $keys:ident, $output:ident) => {
+    ($ext_target:ident, $int_target:ident, $kind:ident, $behavior_name:ident, $get:ident, $insert:ident, $remove:ident, $remove_at_level:ident, $keys_at_level:ident, $keys:ident, $new_internal_key:ident, $output:ident) => {
         pub trait $behavior_name {
             fn $get(&self, var: &Var) -> Option<$output>;
             fn $insert(&mut self, var: Var, value: $output) -> bool;
@@ -64,7 +64,8 @@ macro_rules! env_behavior_helper {
             // Removes value from current env level
             fn $remove_at_level(&mut self, var: &Var);
             fn $keys_at_level(&self) -> HashSet<Var>; 
-            fn $keys(&self) -> HashSet<Var>; 
+            fn $keys(&self) -> HashSet<Var>;
+            fn $new_internal_key(&self) -> Var;
         }
 
         impl $behavior_name for $int_target {
@@ -119,6 +120,15 @@ macro_rules! env_behavior_helper {
                 }
             }
 
+            fn $new_internal_key(&self) -> String {
+                let keys: Vec<String> = self.$keys().iter().cloned().collect();
+                let mut min_internal = 0;
+                for key in keys {
+                    if key.starts_with("__internal__") {min_internal += 1}
+                }
+                format!("__internal__{}", min_internal)
+            }
+
             
         }
 
@@ -147,11 +157,16 @@ macro_rules! env_behavior_helper {
             fn $remove(&mut self, var: &Var) {
                 self.internal.borrow_mut().$remove(var)
             }
+
+            fn $new_internal_key(&self) -> String {
+                self.internal.borrow().$new_internal_key()
+            }
         }
     };
 }
 
-env_behavior_helper!(Environment, EnvironmentInternal, variables, EnvironmentInternalBehaviorVariables, get, insert, remove, remove_at_level, keys_at_level, keys,Value);
+env_behavior_helper!(Environment, EnvironmentInternal, variables, EnvironmentInternalBehaviorVariables, get, insert, remove, remove_at_level, keys_at_level, keys, new_internal_key, Value);
+env_behavior_helper!(Environment, EnvironmentInternal, types, EnvironmentInternalBehaviorTypes, type_get, type_insert, type_remove, type_remove_at_level, type_keys_at_level, type_keys, type_new_internal_key, Type);
 // env_behavior_helper!(types, EnvironmentInternalBehaviorTypes, get_type, insert_type, type_keys, Type);
 
 macro_rules! env_parent_control {
@@ -201,7 +216,7 @@ pub trait EnvironmentBehavior {
 
 impl EnvironmentBehavior for Environment {
     fn new() -> Self {
-        Environment { internal: Arc::new(RefCell::new(EnvironmentInternal {variables: HashMap::new(), parent: None})) }
+        Environment { internal: Arc::new(RefCell::new(EnvironmentInternal {variables: HashMap::new(), types: HashMap::new(), parent: None})) }
     }
 
     fn new_child(&self) -> Self {
@@ -209,7 +224,7 @@ impl EnvironmentBehavior for Environment {
     }
 
     fn new_child_with(&self, with: HashMap<Var, Value>) -> Self {
-        Environment { internal: Arc::new(RefCell::new(EnvironmentInternal { variables: with, parent: Some(self.internal.clone()) })) }
+        Environment { internal: Arc::new(RefCell::new(EnvironmentInternal { variables: with, types: HashMap::new(), parent: Some(self.internal.clone()) })) }
     }
 
     fn cleanup(&mut self) {
@@ -229,7 +244,7 @@ impl EnvironmentBehavior for Environment {
 #[derive(Clone, PartialEq, Debug)]
 pub struct TypeEnvironmentInternal {
     variables: HashMap<Var, Type>,
-    type_variables: HashMap<Var, Type>,
+    type_variables: HashMap<Var, Kind>,
     parent: Option<Arc<RefCell<TypeEnvironmentInternal>>>,
 }
 
@@ -238,14 +253,18 @@ pub struct TypeEnvironment {
     internal: Arc<RefCell<TypeEnvironmentInternal>>,
 }
 
-env_behavior_helper!(TypeEnvironment, TypeEnvironmentInternal, variables, TypeEnvironmentInternalBehaviorVariables, get, insert, remove, remove_at_level, keys_at_level, keys, Type);
-env_behavior_helper!(TypeEnvironment, TypeEnvironmentInternal, type_variables, TypeEnvironmentInternalBehaviorTypeVariables, type_get, type_insert, type_remove, type_remove_at_level, type_keys_at_level, type_keys, Type);
+unsafe impl Send for TypeEnvironment {}
+unsafe impl Sync for TypeEnvironment {}
+
+env_behavior_helper!(TypeEnvironment, TypeEnvironmentInternal, variables, TypeEnvironmentInternalBehaviorVariables, get, insert, remove, remove_at_level, keys_at_level, keys, new_internal_key, Type);
+env_behavior_helper!(TypeEnvironment, TypeEnvironmentInternal, type_variables, TypeEnvironmentInternalBehaviorTypeVariables, typevar_get, typevar_insert, typevar_remove, typevar_remove_at_level, typevar_keys_at_level, typevar_keys, typevar_new_internal_key, Kind);
 env_parent_control!(TypeEnvironmentParentControl, TypeEnvironment);
 
 pub trait TypeEnvironmentBehavior {
     fn new() -> Self;
     fn new_child(&self) -> Self;
-    fn new_child_with(&self, with: HashMap<Var, Type>, with_type_vars: HashMap<Var, Type>) -> Self;
+    fn new_child_with(&self, with: HashMap<Var, Type>, with_type_vars: HashMap<Var, Kind>) -> Self;
+    fn flat_independent_clone(&self) -> Self;
 }
 
 impl TypeEnvironmentBehavior for TypeEnvironment {
@@ -257,7 +276,23 @@ impl TypeEnvironmentBehavior for TypeEnvironment {
         self.new_child_with(HashMap::new(), HashMap::new())
     }
 
-    fn new_child_with(&self, with: HashMap<Var, Type>, with_type_vars: HashMap<Var, Type>) -> Self {
+    fn new_child_with(&self, with: HashMap<Var, Type>, with_type_vars: HashMap<Var, Kind>) -> Self {
         TypeEnvironment { internal: Arc::new(RefCell::new(TypeEnvironmentInternal { variables: with, type_variables: with_type_vars, parent: Some(self.internal.clone()) })) }
+    }
+
+    fn flat_independent_clone(&self) -> Self {
+        let mut indie = TypeEnvironment::new();
+
+        for key in self.keys() {
+            let val = self.get(&key).expect("Error in flat_independent_clone");
+            indie.insert(key, val);
+        }
+
+        for key in self.typevar_keys() {
+            let val = self.typevar_get(&key).expect("Error in flat_independent_clone");
+            indie.typevar_insert(key, val);
+        }
+
+        return indie;
     }
 }

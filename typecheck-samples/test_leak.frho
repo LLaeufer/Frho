@@ -1,5 +1,5 @@
-fun count (a: INT) : INT (if (a == 10) then (a) else (
-    fun fib (a: INT) : INT (if (a <= 2) then (1) else (fib(a-1)+fib(a-2)));
+fun count (a: int) : int (if (a == 10) then (a) else (
+    fun fib (a: int) : int (if (a <= 2) then (1) else (fib(a-1)+fib(a-2)));
     fib(5);
     count(a+1)));
 count(0)

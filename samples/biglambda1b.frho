@@ -1,0 +1,3 @@
+let biglam = lam <X: Ty> (lam (x: X) : X (x));
+let passthrough = app (biglam) <int>;
+passthrough(42)

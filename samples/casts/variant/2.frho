@@ -1,0 +1,3 @@
+// Variant
+
+([number: 42] : [number: +int] =[+#blame]=> *) : * =[+#blame]=> [number: -]

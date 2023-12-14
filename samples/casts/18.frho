@@ -1,0 +1,4 @@
+let my_lam = lam (x: {val: +int, *}) : int (x.val+1);
+let casted_type_lam = my_lam : ({val: +int, *})->(int) =[+#blame]=> all (X: {val}) ({val: +int, X})->(int);
+let applied_type_lam = app (casted_type_lam) <{other_val: +float}>;
+applied_type_lam({val: 41, other_val: 1.234})
