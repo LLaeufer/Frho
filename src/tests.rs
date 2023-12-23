@@ -218,3 +218,4 @@ test_sample_check_type!(test_conv_15, "samples/conv/15.frho", Type::RecordsType(
 test_sample!(test_conv_16, "samples/conv/16.frho", Value::VInt(42));
 test_sample!(test_conv_17, "samples/conv/17.frho", Value::VInt(42));
 test_sample!(test_conv_17b, "samples/conv/17b.frho", Value::VInt(42));
+test_sample!(test_conv_18, "samples/conv/18.frho", Value::VInt(42));

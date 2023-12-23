@@ -1,0 +1,6 @@
+fun my_fun (x: {val: +int, val2: +%alpha}) : int (x.val +1);
+let my_record = if (true) then (
+    {val: 41, val2: "Hello"}: {val: +int, val2: +string} ~[-%alpha]~> {val: +int, val2: +%alpha}) 
+else (
+     {val: 41, val2: false}: {val: +int, val2: +bool} ~[-%alpha]~> {val: +int, val2: +%alpha});
+my_fun(my_record)

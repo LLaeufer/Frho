@@ -188,3 +188,7 @@ test_type_sample!(test_type_conv_15, "samples/conv/15.frho", Type::RecordsType(v
 test_type_sample!(test_type_conv_16, "samples/conv/16.frho", Type::BaseType(BaseType::IntType));
 test_type_sample!(test_type_conv_17, "samples/conv/17.frho", Type::BaseType(BaseType::IntType));
 test_type_sample!(test_type_conv_17b, "samples/conv/17b.frho", Type::BaseType(BaseType::IntType));
+test_type_sample!(test_type_conv_18, "samples/conv/18.frho", Type::BaseType(BaseType::IntType));
+// This should not work this is wrong since two types are in a seal
+// test_type_sample!(test_type_conv_18b, "samples/conv/18b.frho", Type::BaseType(BaseType::IntType));
+test_type_error_sample!(test_type_error_conv_18b, "samples/conv/18b.frho", TypeCheckError::TypeNameConflict("%alpha".to_string(), Type::BaseType(BaseType::BoolType), Type::BaseType(BaseType::StringType)));

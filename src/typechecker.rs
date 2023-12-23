@@ -25,6 +25,7 @@ pub enum TypeCheckError {
     NotConsistentOccurance(FieldOccurrence, FieldOccurrence),
     NotConvertible(Type, Type),
     NotConvertibleOccurance(FieldOccurrence, FieldOccurrence),
+    TypeNameConflict(String, Type, Type),
     UnknownError,
 }
 
@@ -41,10 +42,33 @@ pub fn typecheck_get_kind(env: TypeEnvironment, typ: &Type) -> Result<(TypeEnvir
 }
 
 pub fn typecheck(env: TypeEnvironment, term: &Term) -> TypeCheckResult {
-    match term {
-        Term::Block(terms) => typecheck_block_rec(env.new_child(), unit(), terms, 0),
-        _ => typecheck_single_term(env.new_child(), term)
+    let child = env.new_child();
+    let (mut env, result) = match term {
+        Term::Block(terms) => typecheck_block_rec(child.clone(), unit(), terms, 0),
+        _ => typecheck_single_term(child.clone(), term)
+    }?;
+
+    // Make sure that all type names returned by a block are compatible
+    let mut all_type_names = result.get_all_type_names();
+    let mut atn_counter = 0;
+    while atn_counter != all_type_names.len() {
+        let tn_type = child.get(&all_type_names[atn_counter]);
+        match tn_type {
+            Some(some_ty_type) => {
+                if !env.insert(all_type_names[atn_counter].clone(), some_ty_type.clone()) {
+                    match env.get(&all_type_names[atn_counter]) {
+                        Some(original_type) => if !original_type.equal(&some_ty_type) {return Err(TypeCheckError::TypeNameConflict(all_type_names[atn_counter].clone(), original_type,some_ty_type))},
+                        None => return Err(TypeCheckError::UnknownError),
+                    }
+                }
+                let mut new_type_names = some_ty_type.get_all_type_names();
+                if new_type_names.len() != 0 {all_type_names.append(&mut new_type_names)}
+            },
+            None => {},
+        }
+        atn_counter += 1;
     }
+    Ok((env, result))
 }
 
 pub fn typecheck_verify(env: TypeEnvironment, term: &Term, verify_type: &Type) -> Result<(TypeEnvironment, bool), TypeCheckError> {

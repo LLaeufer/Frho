@@ -1,0 +1,3 @@
+let my_record = {val: 41, val2: "Hello"}: {val: +int, val2: +string} ~[-%alpha]~> {val: +int, val2: +%alpha};
+fun my_fun (x: {val: +int, val2: +%alpha}) : int (x.val +1);
+my_fun(my_record)

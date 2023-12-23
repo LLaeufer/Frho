@@ -366,6 +366,7 @@ pub trait TypeUtils {
     fn get_universal_types(&self) -> Option<(String, Kind, Type)>;
     fn get_record_fields(&self) -> Option<(Vec<(String, FieldOccurrence)>, RecordAndVariantEnd)>;
     fn get_variant_fields(&self) -> Option<(Vec<(String, FieldOccurrence)>, RecordAndVariantEnd)>;
+    fn get_all_type_names(&self) -> Vec<String>;
 
     fn is_seal(&self) -> bool;
     fn is_seal_record(&self) -> bool;
@@ -551,6 +552,24 @@ impl TypeUtils for Type {
         }
     }
 
+    fn get_all_type_names(&self) -> Vec<String> {
+        match self {
+            Type::TypeVariable(_) => vec![],
+            Type::TypeName(name) => vec![name.clone()],
+            Type::BaseType(_) => vec![],
+            Type::DynType => vec![],
+            Type::UniversalType(_, _, subtype) => subtype.get_all_type_names(),
+            Type::RecordsType(occs, _) => get_all_type_names_row(occs),
+            Type::VariantType(occs, _) => get_all_type_names_row(occs),
+            Type::FunctionType(argument, return_type) => {
+                let mut argument_vec = argument.get_all_type_names();
+                argument_vec.append(&mut return_type.get_all_type_names());
+                argument_vec
+            },
+            _ => vec![],
+        }
+    }
+
     fn is_cast(&self) -> bool {
         match self {
             Type::CastAndConvType(CastAndConvType::CastType(_, _, _, _)) => true,
@@ -580,6 +599,17 @@ impl TypeUtils for Type {
     }
 
 
+}
+
+fn get_all_type_names_row(row: &Vec<(String, FieldOccurrence)>) -> Vec<String> {
+    let mut outvec = vec![];
+    for (_label, occ) in row {
+        match occ.to_type() {
+            Some(occ_type) => outvec.append(&mut occ_type.get_all_type_names()),
+            None => {},
+        }
+    }
+    outvec
 }
 
 impl fmt::Display for BaseType {

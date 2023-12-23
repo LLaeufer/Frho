@@ -10,14 +10,11 @@ typeName, alpha, beta := "%" label
 labels := label "," labels | label | ""
 
 # Values
-values := int | float | bool | string | record | variant
-constant := int | float | bool | string
+constant_value := int | float | bool | string
 int := [0-9]+
 float := [0-9]+\.[0-9]+
 bool := "true" | "false"
 string := String flanked by " symbols, not containing any " in the string
-record := "{" labeledTerms "}"
-variant := "[" labeledTerm "]"
 
 # Kinds
 kind, K := ty | L
@@ -33,6 +30,8 @@ type, A, B := typeVariable | typeName | "int" | "bool" | "float" | "string" | "*
 term, M := constant 
          | let
          | variable
+         | recordCreation
+         | variantCreation
          | recordSelection
          | recordUpdate
          | if
@@ -48,9 +47,11 @@ term, M := constant
          | funCall
          | algorithmicFunctions
 
-constant := values
+constant := constant_value
 let := "let" label "=" term
 variable := label
+recordCreation := "{" labeledTerms "}"
+variantCreation := "[" labeledTerm "]"
 recordSelection := lightTerm "." label
 recordUpdate := lightTerm "." label "<-" term
 if := "if" termBlock "then" termBlock "else" termBlock
