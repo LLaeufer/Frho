@@ -1,0 +1,3 @@
+// Blame (+#blame_record_2)
+let myrecord = ({a_number: 42, a_bool: true} : {a_number: +int, a_bool: +bool} =[+#blame_record]=> *) : * =[+#blame_record_2]=> {a_number: +float, a_bool: +bool};
+((myrecord : {a_number: +float, a_bool: +bool}  =[+#blame_record_3]=> *) : * =[+#blame_record_4]=> {a_number: +int, a_bool: +bool}).a_number

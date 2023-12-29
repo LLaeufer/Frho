@@ -1,0 +1,2 @@
+let mybool = (true : bool =[+#blame]=> *) : * =[+#blame2]=> bool;
+if (mybool) then (42) else (0)

@@ -8,8 +8,6 @@ use std::fmt::{self};
 
 pub type EvaluationResult = Value;
 
-
-// https://stackoverflow.com/questions/31373255/how-do-i-share-a-mutable-object-between-threads-using-arc
 #[derive(Clone, PartialEq, Debug)]
 pub struct EnvironmentInternal {
     variables: HashMap<Var, Value>,

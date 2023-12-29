@@ -52,7 +52,7 @@ fn main() {
         "eval-debug2" => run_interpret(true, false, args),
         "type-debug" => run_typecheck(true, args),
         "info" => println!("Frho interpreter by L. Läufer \nUse \"help\" for all commands"),
-        "help" => println!("Command list:\ninterpret <path>\ndebug <path>\t\tFor more information while interpreting\ndebug2 <path>\t\tFor more information while interpreting\ntype-debug <path>\tFor information about the expected type\ninfo\t\t\tInformation about the interpreter\nhelp\t\t\tThis page"),
+        "help" => println!("Command list:\ninterpret <path>\ndebug <path>\t\tFor more information while interpreting\neval-debug <path>\tOnly run the evaluator\neval-debug2 <path>\tOnly run the evaluator - High stack size disabled\ntype-debug <path>\tOnly run the type-checker\ninfo\t\t\tInformation about the interpreter\nhelp\t\t\tThis page"),
         _ => println!("Frho interpreter by L. Läufer \nUse \"help\" for all commands"),
     }
 }
