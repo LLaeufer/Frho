@@ -1,0 +1,1 @@
+(({a_number: 42, a_bool: true} : {a_number: +int, a_bool: +bool} =[+#blame_record]=> {a_number: +int, a_bool: +bool, *}): {a_number: +int, a_bool: +bool, *} =[+#blame_record_2]=> {a_number: +int, a_bool: +bool}).a_number
